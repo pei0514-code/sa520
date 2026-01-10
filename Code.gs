@@ -21,6 +21,8 @@ function doPost(e) {
         break;
       case 'register': result = registerMember(params); break;
       case 'booking': result = saveBooking(params); break;
+      case 'updateBooking': result = updateBooking(params); break;
+      case 'findBooking': result = findBooking(params); break;
       case 'updateMember': result = updateMember(params); break;
       case 'deleteMember': result = deleteMember(params); break;
       case 'savePreOrder': result = savePreOrder(params); break;
@@ -93,6 +95,10 @@ function getSystemSettings() {
         settings["MaxCapacity"] = 30;
         sheet.appendRow(["MaxCapacity", 30]);
     }
+    if (!settings["MinCharge"]) {
+        settings["MinCharge"] = 0;
+        sheet.appendRow(["MinCharge", 0]);
+    }
     return settings;
 }
 
@@ -121,6 +127,48 @@ function getBookingsSummary() {
     return summary;
 }
 
+function findBooking(params) {
+    var sheet = getOrCreateSheet("訂位紀錄");
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    var today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Skip header
+    for (var i = 1; i < data.length; i++) {
+        var rowDate = new Date(data[i][2]);
+        var rowName = data[i][10];
+        var rowPhone = data[i][11];
+        
+        // Match Name and Phone (exact match), and only future dates
+        if (rowDate >= today && rowName == params.name && rowPhone == params.phone) {
+            var dateStr = rowDate.toISOString().split('T')[0];
+            // Format time HH:mm
+            var timeStr = data[i][3]; 
+            if (timeStr instanceof Date) {
+               timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
+            }
+
+            results.push({
+                id: i + 1, // Row number as ID
+                date: dateStr,
+                time: timeStr,
+                adults: data[i][4],
+                children: data[i][5],
+                highChairs: data[i][6],
+                vegetarian: data[i][7] === '是',
+                seating: data[i][8],
+                occasion: data[i][9],
+                name: rowName,
+                phone: rowPhone,
+                notes: data[i][12],
+                preOrder: data[i][13]
+            });
+        }
+    }
+    return { status: 'success', bookings: results };
+}
+
 // ========================
 // Data Modification Functions
 // ========================
@@ -136,6 +184,27 @@ function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
   sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', data.seating, data.occasion, data.name, data.phone, data.notes, '' ]);
   return { status: 'success', bookingId: sheet.getLastRow() };
+}
+
+function updateBooking(data) {
+    var sheet = getOrCreateSheet("訂位紀錄");
+    var row = Number(data.bookingId);
+    if (row > 1 && row <= sheet.getLastRow()) {
+        sheet.getRange(row, 3).setValue(data.date);
+        sheet.getRange(row, 4).setValue(data.time);
+        sheet.getRange(row, 5).setValue(data.adults);
+        sheet.getRange(row, 6).setValue(data.children);
+        sheet.getRange(row, 7).setValue(data.highChairs);
+        sheet.getRange(row, 8).setValue(data.vegetarian ? '是' : '否');
+        sheet.getRange(row, 9).setValue(data.seating);
+        sheet.getRange(row, 10).setValue(data.occasion);
+        sheet.getRange(row, 11).setValue(data.name);
+        sheet.getRange(row, 12).setValue(data.phone);
+        sheet.getRange(row, 13).setValue(data.notes);
+        // Preorder is not wiped here, handled by savePreOrder
+        return { status: 'success', bookingId: row };
+    }
+    return { status: 'error', message: '訂位資料找不到' };
 }
 
 function updateMember(data) {
