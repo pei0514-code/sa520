@@ -23,7 +23,7 @@
     }
     .animate-fade-in { animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .input-field { @apply w-full p-3 border rounded-xl bg-white focus:ring-2 focus:ring-italian-green outline-none transition-all; }
+    .input-field { @apply w-full p-3 border rounded-xl bg-white focus:ring-2 focus:ring-green-700 outline-none transition-all; }
     .label-text { @apply text-xs font-bold text-gray-500 mb-1 block uppercase tracking-wider; }
   </style>
 
@@ -95,7 +95,7 @@
 
       if (loading) return (
         React.createElement("div", { className: "fixed inset-0" },
-          React.createElement("img", { src: "https://i.ibb.co/XZ50Lsh8/IMG-6769.png", className: "w-full h-full object-cover" })
+          React.createElement("img", { src: "https://i.ibb.co/93NGBjjh/IMG-6773.jpg", className: "w-full h-full object-cover" })
         )
       );
 
@@ -203,7 +203,7 @@
             React.createElement("div", { className: "flex gap-4 items-start" }, React.createElement(Icon, { name: "map", className: "w-6 h-6 text-[#2c5e50] shrink-0 mt-1" }), React.createElement("div", null, React.createElement("h4", { className: "font-bold" }, "餐廳地址"), React.createElement("p", { className: "text-gray-600" }, "金門縣金湖鎮太湖路二段3巷6號"))),
             React.createElement("div", { className: "flex gap-4 items-start" }, React.createElement(Icon, { name: "phone", className: "w-6 h-6 text-[#2c5e50] shrink-0 mt-1" }), React.createElement("div", null, React.createElement("h4", { className: "font-bold" }, "聯絡電話"), React.createElement("p", { className: "text-gray-600" }, "082-332530")))
         ),
-        React.createElement("div", { className: "bg-italian-green/5 p-4 rounded-xl border border-italian-green/10" },
+        React.createElement("div", { className: "bg-green-50 p-4 rounded-xl border border-green-200" },
            React.createElement("h4", { className: "font-bold text-gray-800 mb-3" }, "營業資訊"),
            React.createElement("div", {className: "space-y-2 text-sm text-gray-600"},
                React.createElement("p", null, "每週二至週日 11:00 - 14:00 / 17:00 - 20:30"),
@@ -218,7 +218,7 @@
       promotions.map((p, i) => React.createElement("div", { key: i, className: "bg-white rounded-xl shadow-md border overflow-hidden" }, 
         p.image && React.createElement("img", { src: p.image, className: "w-full h-44 object-cover" }), 
         React.createElement("div", { className: "p-4" }, 
-          React.createElement("h3", { className: "font-bold text-italian-green" }, p.title), 
+          React.createElement("h3", { className: "font-bold text-green-800" }, p.title), 
           React.createElement("p", { className: "text-sm text-gray-500 mt-1" }, p.desc)
         )
       ))
@@ -246,24 +246,24 @@
               text: `🔔 薩諾瓦訂位確認：\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n我們會盡快為您確認位置！`
             }]).catch(err => console.error("Send message error", err));
           }
-          await Swal.fire('預約成功', '已發送訊息至官方帳號並保存紀錄', 'success');
+          await Swal.fire({ icon: 'success', title: '預約成功', text: '已發送訊息至官方帳號並保存紀錄', confirmButtonColor: '#2c5e50' });
           onBack();
         } else {
-          Swal.fire('失敗', res.message, 'error');
+          Swal.fire({ icon: 'error', title: '預約失敗', text: res.message, confirmButtonColor: '#D32F2F' });
         }
         setSubmitting(false);
       };
 
       return React.createElement("form", { onSubmit: handleBooking, className: "p-6 space-y-6 bg-gray-50" },
         React.createElement("div", { className: "p-4 bg-white rounded-xl shadow-sm border" },
-            React.createElement("h3", {className: "font-bold text-gray-700 mb-4"}, "用餐時間"),
+            React.createElement("h3", {className: "font-bold text-gray-700 mb-4 flex items-center gap-2"}, React.createElement(Icon, {name: "calendar", className: "w-5 h-5 text-green-600"}), "用餐時間"),
             React.createElement("div", { className: "grid grid-cols-2 gap-4" },
                 React.createElement("div", null, React.createElement("span", { className: "label-text" }, "日期"), React.createElement("input", { type: "date", className: "input-field", value: form.date, onChange: e => setForm({ ...form, date: e.target.value }) })),
                 React.createElement("div", null, React.createElement("span", { className: "label-text" }, "時間"), React.createElement("input", { type: "time", className: "input-field", value: form.time, onChange: e => setForm({ ...form, time: e.target.value }) }))
             )
         ),
         React.createElement("div", { className: "p-4 bg-white rounded-xl shadow-sm border" },
-            React.createElement("h3", {className: "font-bold text-gray-700 mb-4"}, "用餐人數"),
+            React.createElement("h3", {className: "font-bold text-gray-700 mb-4 flex items-center gap-2"}, React.createElement(Icon, {name: "user", className: "w-5 h-5 text-purple-600"}), "用餐人數"),
             React.createElement("div", { className: "grid grid-cols-3 gap-3" },
               React.createElement("div", null, React.createElement("span", { className: "label-text" }, "大人"), React.createElement("select", { className: "input-field", value: form.adults, onChange: e => setForm({ ...form, adults: parseInt(e.target.value) }) }, [...Array(41).keys()].slice(1).map(n => React.createElement("option", { key: n, value: n }, n)))),
               React.createElement("div", null, React.createElement("span", { className: "label-text" }, "小孩"), React.createElement("select", { className: "input-field", value: form.children, onChange: e => setForm({ ...form, children: parseInt(e.target.value) }) }, [...Array(41).keys()].map(n => React.createElement("option", { key: n, value: n }, n)))),
@@ -271,14 +271,14 @@
             )
         ),
         React.createElement("div", { className: "p-4 bg-white rounded-xl shadow-sm border" },
-             React.createElement("h3", {className: "font-bold text-gray-700 mb-4"}, "聯絡資訊"),
+             React.createElement("h3", {className: "font-bold text-gray-700 mb-4 flex items-center gap-2"}, React.createElement(Icon, {name: "phone", className: "w-5 h-5 text-blue-600"}), "聯絡資訊"),
              React.createElement("div", {className: "space-y-4"},
                 React.createElement("div", null, React.createElement("span", { className: "label-text" }, "聯絡姓名"), React.createElement("input", { className: "input-field", required: true, value: form.name, onChange: e => setForm({ ...form, name: e.target.value }) })),
                 React.createElement("div", null, React.createElement("span", { className: "label-text" }, "聯絡電話"), React.createElement("input", { type: "tel", className: "input-field", required: true, value: form.phone, onChange: e => setForm({ ...form, phone: e.target.value }) }))
              )
         ),
         React.createElement("p", {className: "text-xs text-center text-gray-400 px-4"}, "為確保服務品質，線上僅接受40人內訂位，若有其他需求請來電洽詢。"),
-        React.createElement("button", { type: "submit", disabled: submitting, className: "w-full bg-[#D32F2F] text-white py-4 rounded-xl font-bold shadow-lg disabled:bg-gray-400" }, submitting ? "處理中..." : "確認送出")
+        React.createElement("button", { type: "submit", disabled: submitting, className: "w-full bg-[#D32F2F] text-white py-4 rounded-xl font-bold shadow-lg disabled:bg-gray-400 transition-colors" }, submitting ? "處理中..." : "確認送出")
       );
     };
 
@@ -290,8 +290,12 @@
         e.preventDefault();
         setSubmitting(true);
         const res = await runGAS('register', { ...form, lineUserId: profile?.userId });
-        if (res.status === 'success') { onRegister(res.member); Swal.fire('歡迎加入!', '已獲得新會員點數 100 點', 'success'); }
-        else { Swal.fire('錯誤', res.message, 'error'); }
+        if (res.status === 'success') { 
+            onRegister(res.member); 
+            Swal.fire({ icon: 'success', title: '歡迎加入!', text: '已獲得新會員點數 100 點', confirmButtonColor: '#2c5e50' });
+        } else { 
+            Swal.fire({ icon: 'error', title: '註冊失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+        }
         setSubmitting(false);
       };
 
@@ -315,15 +319,15 @@
       return React.createElement("form", { onSubmit: handleReg, className: "p-6 space-y-4" },
         React.createElement("div", null, React.createElement("span", { className: "label-text" }, "您的姓名"), React.createElement("input", { className: "input-field", required: true, value: form.name, onChange: e => setForm({ ...form, name: e.target.value }) })),
         React.createElement("div", null, React.createElement("span", { className: "label-text" }, "手機號碼"), React.createElement("input", { type: "tel", className: "input-field", required: true, value: form.phone, onChange: e => setForm({ ...form, phone: e.target.value }) })),
-        React.createElement("div", { className: "p-4 bg-italian-green/5 rounded-2xl border border-dashed border-italian-green/30" },
-           React.createElement("span", { className: "label-text text-italian-green" }, "🎂 生日驚喜"),
-           React.createElement("input", { type: "date", className: "input-field border-italian-green/20", required: true, value: form.birthday, onChange: e => setForm({ ...form, birthday: e.target.value }) }),
+        React.createElement("div", { className: "p-4 bg-green-50 rounded-2xl border border-dashed border-green-200" },
+           React.createElement("span", { className: "label-text text-green-700" }, "🎂 生日驚喜"),
+           React.createElement("input", { type: "date", className: "input-field border-green-200", required: true, value: form.birthday, onChange: e => setForm({ ...form, birthday: e.target.value }) }),
            React.createElement("p", { className: "text-[10px] text-gray-400 mt-2" }, "* 生日當月贈送專屬生日餐券乙張")
         ),
         React.createElement("div", null, React.createElement("span", { className: "label-text" }, "性別"), React.createElement("select", { className: "input-field", value: form.gender, onChange: e => setForm({ ...form, gender: e.target.value }) }, React.createElement("option", null, "男"), React.createElement("option", null, "女"), React.createElement("option", null, "不透漏"))),
         React.createElement("div", null, React.createElement("span", { className: "label-text" }, "電子信箱"), React.createElement("input", { type: "email", className: "input-field", value: form.email, onChange: e => setForm({ ...form, email: e.target.value }) })),
         React.createElement("div", null, React.createElement("span", { className: "label-text" }, "地址"), React.createElement("input", { className: "input-field", value: form.address, onChange: e => setForm({ ...form, address: e.target.value }) })),
-        React.createElement("button", { type: "submit", disabled: submitting, className: "w-full bg-[#2c5e50] text-white py-4 rounded-xl font-bold shadow-md disabled:bg-gray-400" }, submitting ? "處理中..." : "確認加入")
+        React.createElement("button", { type: "submit", disabled: submitting, className: "w-full bg-[#2c5e50] text-white py-4 rounded-xl font-bold shadow-md disabled:bg-gray-400 transition-colors" }, submitting ? "處理中..." : "確認加入")
       );
     };
 
