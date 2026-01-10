@@ -14,7 +14,10 @@ function doPost(e) {
           status: 'success',
           member: getMemberByLineId(lineUserId),
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
+          // 確保欄位名稱對應試算表
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
+          // 新增主廚推薦讀取
+          chefRecommendations: getSheetDataAsJson("主廚推薦", ["產品名稱", "產品價格", "產品說明", "圖片網址"]),
           slotSettings: getSlotSettings(), 
           bookingsSummary: getBookingsSummary()
         };
@@ -50,8 +53,9 @@ function doPost(e) {
 // ========================
 function getMemberByLineId(lineUserId) {
   if (!lineUserId) return null;
+  // lineid 全部小寫以防萬一，但寫入時是用 LINE ID
   var data = getSheetDataAsJson("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
-  return data.find(row => row['lineid'] === lineUserId) || null;
+  return data.find(row => row['LINE ID'] === lineUserId) || null;
 }
 
 function getSheetDataAsJson(sheetName, headers) {
@@ -64,7 +68,12 @@ function getSheetDataAsJson(sheetName, headers) {
         var rowData = values[i];
         var obj = {};
         for (var j = 0; j < headerRow.length; j++) {
-            obj[headerRow[j]] = rowData[j];
+            // 處理日期格式，轉為 ISO 字串方便前端使用
+            if (rowData[j] instanceof Date) {
+                obj[headerRow[j]] = rowData[j].toISOString();
+            } else {
+                obj[headerRow[j]] = rowData[j];
+            }
         }
         jsonData.push(obj);
     }
@@ -195,7 +204,18 @@ function registerMember(data) {
   sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 100, data.gender, data.email ]);
   addPoints(data.lineUserId, 100, "新會員註冊禮");
   getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
-  return { status: 'success', member: getMemberByLineId(data.lineUserId) };
+  
+  // 直接回傳建立好的物件，不用再查一次資料庫，確保速度與一致性
+  var newMember = {
+    'LINE ID': data.lineUserId,
+    '姓名': data.name,
+    '電話': data.phone,
+    '生日': data.birthday,
+    '點數': 100,
+    '性別': data.gender,
+    'Email': data.email
+  };
+  return { status: 'success', member: newMember };
 }
 
 function saveBooking(data) {
@@ -245,7 +265,14 @@ function updateMember(data) {
       sheet.getRange(i + 1, 5).setValue(data.birthday);
       if (values[0].length > 6) sheet.getRange(i + 1, 7).setValue(data.gender);
       if (values[0].length > 7) sheet.getRange(i + 1, 8).setValue(data.email);
-      return { status: 'success', member: getMemberByLineId(data.lineUserId) };
+      // 回傳更新後的物件
+      return { 
+          status: 'success', 
+          member: {
+            'LINE ID': data.lineUserId, '姓名': data.name, '電話': data.phone, '生日': data.birthday, '性別': data.gender, 'Email': data.email,
+            '點數': Number(values[i][5]) // 保留原有點數
+          }
+      };
     }
   }
   return { status: 'error', message: '會員不存在' };

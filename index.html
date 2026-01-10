@@ -94,7 +94,7 @@
     const App = () => {
       const [view, setView] = useState('HOME');
       const [loading, setLoading] = useState(true);
-      const [data, setData] = useState({ member: null, faqs: [], promotions: [], slotSettings: {}, bookingsSummary: [] });
+      const [data, setData] = useState({ member: null, faqs: [], promotions: [], slotSettings: {}, bookingsSummary: [], chefRecommendations: [] });
       const [profile, setProfile] = useState(null);
       const [currentBooking, setCurrentBooking] = useState(null);
       
@@ -151,7 +151,7 @@
 
       switch(view) {
         case 'HOME': return React.createElement(HomeView, { setView, profile, data });
-        case 'MENU': return React.createElement(BaseView, { title: "精緻菜單", onBack: goHome }, React.createElement(MenuView));
+        case 'MENU': return React.createElement(BaseView, { title: "精緻菜單", onBack: goHome }, React.createElement(MenuView, { chefRecommendations: data.chefRecommendations }));
         case 'LOCATION': return React.createElement(BaseView, { title: "店家資訊", onBack: goHome }, React.createElement(LocationView, { profile }));
         case 'NEWS': return React.createElement(BaseView, { title: "活動與優惠", onBack: goHome }, React.createElement(NewsView, { promotions: data.promotions }));
         case 'FAQ': return React.createElement(BaseView, { title: "常見問題", onBack: goHome }, React.createElement(FaqView, { faqs: data.faqs }));
@@ -207,15 +207,13 @@
       )
     );
     
-    const MenuView = () => {
+    const MenuView = ({ chefRecommendations }) => {
         const [modalItem, setModalItem] = useState(null);
+        const [dishModal, setDishModal] = useState(null);
         const [tab, setTab] = useState('FEATURED');
         
-        const featuredDishes = [
-            { n: "極品X.O醬海鮮義大利麵", p: 250, img: "https://i.ibb.co/QFTKgJ1B/2023-03-25.webp", desc: "主廚特製XO醬拌炒，鮮味十足" },
-            { n: "黑松露野菇燉飯", p: 290, img: "https://i.ibb.co/hJ6cfgjM/2025-12-28.webp", desc: "濃郁黑松露香氣，素食者最愛" },
-            { n: "義式肉醬野菇披薩", p: 160, img: "https://i.ibb.co/qLFg7gSk/Gemini-Generated-Image-cmj4yzcmj4yzcmj4.png", desc: "經典義式風味，現烤薄脆口感" }
-        ];
+        // Use data from props if available, otherwise fallback to default for demo
+        const dishes = (chefRecommendations && chefRecommendations.length > 0) ? chefRecommendations : [];
 
         const menuItems = [
             { src: "https://i.ibb.co/QFTKgJ1B/2023-03-25.webp", label: "菜單正面", filename: "sanova-menu-front.webp" },
@@ -230,12 +228,13 @@
             React.createElement("div", { className: "p-6 space-y-8" },
                 tab === 'FEATURED' ? 
                 React.createElement("div", { className: "space-y-4" },
-                    featuredDishes.map((d, i) => React.createElement("div", { key: i, className: "bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 flex" },
-                        React.createElement("img", { src: d.img, className: "w-28 h-28 object-cover" }),
+                    dishes.length === 0 ? React.createElement("p", {className: "text-center text-gray-400"}, "目前沒有主廚推薦項目。") :
+                    dishes.map((d, i) => React.createElement("div", { key: i, onClick: () => setDishModal(d), className: "bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 flex cursor-pointer hover:shadow-lg transition-shadow" },
+                        React.createElement("img", { src: d['圖片網址'], className: "w-28 h-28 object-cover shrink-0" }),
                         React.createElement("div", { className: "p-3 flex flex-col justify-center flex-1" },
-                             React.createElement("h4", { className: "font-bold text-gray-800" }, d.n),
-                             React.createElement("p", { className: "text-xs text-gray-500 mt-1 line-clamp-2" }, d.desc),
-                             React.createElement("p", { className: "text-[#B91C1C] font-bold mt-2" }, `$${d.p}`)
+                             React.createElement("h4", { className: "font-bold text-gray-800" }, d['產品名稱']),
+                             React.createElement("p", { className: "text-xs text-gray-500 mt-1 line-clamp-2" }, d['產品說明']),
+                             React.createElement("p", { className: "text-[#B91C1C] font-bold mt-2" }, `$${d['產品價格']}`)
                         )
                     ))
                 ) :
@@ -250,6 +249,7 @@
                     )
                 )
             ),
+            // Menu Image Modal
             modalItem && React.createElement("div", {
                     className: "fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 animate-fade-in p-4",
                     onClick: () => setModalItem(null)
@@ -271,6 +271,36 @@
                         download: modalItem.filename,
                         className: "mt-4 inline-flex items-center justify-center gap-2 bg-[#B91C1C] text-white px-5 py-3 rounded-lg text-sm font-bold shadow-md hover:bg-opacity-90 transition-all"
                     }, React.createElement(Icon, { name: "download", className: "w-5 h-5" }), "下載菜單")
+                )
+            ),
+            // Dish Detail Modal
+            dishModal && React.createElement("div", {
+                className: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in",
+                onClick: () => setDishModal(null)
+            },
+                React.createElement("div", { 
+                    className: "bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-slide-up",
+                    onClick: e => e.stopPropagation() 
+                },
+                    React.createElement("div", { className: "relative h-64" },
+                        React.createElement("img", { src: dishModal['圖片網址'], className: "w-full h-full object-cover" }),
+                        React.createElement("button", { 
+                            onClick: () => setDishModal(null),
+                            className: "absolute top-3 right-3 bg-black/30 text-white p-1 rounded-full backdrop-blur-md hover:bg-black/50 transition-colors"
+                        }, React.createElement(Icon, {name:"close", className:"w-6 h-6"}))
+                    ),
+                    React.createElement("div", { className: "p-6" },
+                        React.createElement("div", { className: "flex justify-between items-start mb-2" },
+                             React.createElement("h3", { className: "text-2xl font-bold text-gray-800" }, dishModal['產品名稱']),
+                             React.createElement("span", { className: "text-xl font-bold text-[#B91C1C]" }, `$${dishModal['產品價格']}`)
+                        ),
+                        React.createElement("div", { className: "h-px bg-gray-100 my-4" }),
+                        React.createElement("p", { className: "text-gray-600 leading-relaxed text-sm" }, dishModal['產品說明']),
+                        React.createElement("button", {
+                            onClick: () => setDishModal(null),
+                            className: "w-full mt-6 bg-[#B91C1C] text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200 active:scale-95 transition-transform"
+                        }, "關閉")
+                    )
                 )
             )
         );
@@ -335,7 +365,7 @@
 
     const NewsView = ({ promotions }) => {
         const [filter, setFilter] = useState('ALL');
-        const filtered = filter === 'ALL' ? promotions : promotions.filter(p => p.類型 === filter);
+        const filtered = filter === 'ALL' ? promotions : promotions.filter(p => p['類型'] === filter);
         
         return React.createElement("div", { className: "flex flex-col h-full" },
              React.createElement("div", { className: "flex p-4 gap-2 overflow-x-auto no-scrollbar bg-white shadow-sm sticky top-0 z-10" },
@@ -344,12 +374,12 @@
              React.createElement("div", { className: "p-4 space-y-4 flex-1 overflow-y-auto" },
                 !filtered || filtered.length === 0 ? React.createElement("p", {className: "text-center text-gray-500 mt-8"}, "目前沒有相關內容。") :
                 filtered.map((p, i) => React.createElement("div", { key: i, className: "bg-white rounded-xl shadow-md border overflow-hidden" },
-                    p.圖片網址 && React.createElement("img", { src: p.圖片網址, className: "w-full h-44 object-cover" }),
+                    p['圖片網址'] && React.createElement("img", { src: p['圖片網址'], className: "w-full h-44 object-cover" }),
                     React.createElement("div", { className: "p-4" },
-                        p.類型 === '活動' && React.createElement("div", { className: "text-sm text-red-600 font-bold mb-1 flex items-center gap-1" }, React.createElement(Icon, {name:"calendar", className:"w-4 h-4"}), `活動日期：${new Date(p.活動日期).toLocaleDateString()}`),
-                        React.createElement("h3", { className: "font-bold text-[#B91C1C]" }, p.標題),
-                        React.createElement("p", { className: "text-sm text-gray-500 mt-1" }, p.內容),
-                         p.類型 === '優惠' && React.createElement("button", { onClick: () => Swal.fire('已領取', '優惠券已存入您的票夾', 'success'), className: "mt-3 w-full border border-[#B91C1C] text-[#B91C1C] py-2 rounded-lg text-sm font-bold hover:bg-red-50" }, "領取優惠券")
+                        p['類型'] === '活動' && React.createElement("div", { className: "text-sm text-red-600 font-bold mb-1 flex items-center gap-1" }, React.createElement(Icon, {name:"calendar", className:"w-4 h-4"}), `活動日期：${new Date(p['活動日期']).toLocaleDateString()}`),
+                        React.createElement("h3", { className: "font-bold text-[#B91C1C]" }, p['標題']),
+                        React.createElement("p", { className: "text-sm text-gray-500 mt-1" }, p['內容']),
+                         p['類型'] === '優惠' && React.createElement("button", { onClick: () => Swal.fire('已領取', '優惠券已存入您的票夾', 'success'), className: "mt-3 w-full border border-[#B91C1C] text-[#B91C1C] py-2 rounded-lg text-sm font-bold hover:bg-red-50" }, "領取優惠券")
                     )
                 ))
             )
@@ -757,9 +787,10 @@
             setSubmitting(true);
             const res = await runGAS('register', { ...regForm, lineUserId: profile?.userId });
             if (res.status === 'success') { 
-                // Fix: Immediately update parent state to trigger re-render to "Member" view
+                // 註冊成功後，立即通知父組件更新狀態
                 onMemberUpdate(res.member); 
                 Swal.fire({ icon: 'success', title: '歡迎加入!', text: '已獲得新會員點數 100 點', confirmButtonColor: '#B91C1C' });
+                // 此時因父組件狀態改變，MemberView 會重新渲染，因 member 存在而進入會員中心介面
             } else { 
                 Swal.fire({ icon: 'error', title: '註冊失敗', text: res.message, confirmButtonColor: '#D32F2F' });
             }
