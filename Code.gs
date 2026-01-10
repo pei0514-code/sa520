@@ -15,7 +15,7 @@ function doPost(e) {
           member: getMemberByLineId(lineUserId),
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
-          settings: getSystemSettings(),
+          slotSettings: getSlotSettings(), // Updated to return map of time slots
           bookingsSummary: getBookingsSummary()
         };
         break;
@@ -83,21 +83,41 @@ function getStampCardStatus(lineUserId) {
     return userStamps ? userStamps.點數 : 0;
 }
 
-function getSystemSettings() {
-    var sheet = getOrCreateSheet("系統設定", ["Key", "Value"]);
+function getSlotSettings() {
+    // Expected Columns: 時段 (A), 可訂位人數 (B), 已訂位人數 (C), 剩餘空位 (D), 低消設定 (E)
+    // Note: C and D in the sheet are likely for display/manual entry if static, but the App calculates dynamic availability.
+    // The App reads A, B, and E to determine limits and rules.
+    var sheet = getOrCreateSheet("系統設定", ["時段", "可訂位人數", "已訂位人數", "剩餘空位", "低消設定"]);
     var data = sheet.getDataRange().getValues();
+    
+    // Initialize defaults if empty
+    if (data.length <= 1) {
+        var defaults = [
+            ["11:00", 30, "", "", 180], ["11:30", 30, "", "", 180], ["12:00", 30, "", "", 180], 
+            ["12:30", 30, "", "", 180], ["13:00", 30, "", "", 180],
+            ["17:00", 30, "", "", 180], ["17:30", 30, "", "", 180], ["18:00", 30, "", "", 180], 
+            ["18:30", 30, "", "", 180], ["19:00", 30, "", "", 180], ["19:30", 30, "", "", 180], 
+            ["20:00", 30, "", "", 180]
+        ];
+        defaults.forEach(row => sheet.appendRow(row));
+        data = sheet.getDataRange().getValues();
+    }
+
     var settings = {};
     for (var i = 1; i < data.length; i++) {
-        settings[data[i][0]] = data[i][1];
-    }
-    // Default setting if not present
-    if (!settings["MaxCapacity"]) {
-        settings["MaxCapacity"] = 30;
-        sheet.appendRow(["MaxCapacity", 30]);
-    }
-    if (!settings["MinCharge"]) {
-        settings["MinCharge"] = 0;
-        sheet.appendRow(["MinCharge", 0]);
+        var time = data[i][0];
+        // Ensure time is formatted correctly if coming from Sheet date object
+        if (time instanceof Date) {
+            time = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
+        } else {
+             // Handle case like "11:00:00" string or just "11:00"
+             time = String(time).substring(0, 5);
+        }
+        
+        settings[time] = {
+            max: Number(data[i][1]) || 30,
+            minCharge: Number(data[i][4]) || 0
+        };
     }
     return settings;
 }
@@ -121,7 +141,14 @@ function getBookingsSummary() {
         
         if (d >= today) {
             var dateStr = d.toISOString().split('T')[0];
-            summary.push({ date: dateStr, time: time, count: adults + children });
+            // Normalize time string from sheet
+            var timeStr = time;
+            if (time instanceof Date) {
+                 timeStr = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
+            } else {
+                 timeStr = String(time).substring(0, 5);
+            }
+            summary.push({ date: dateStr, time: timeStr, count: adults + children });
         }
     }
     return summary;
@@ -147,6 +174,8 @@ function findBooking(params) {
             var timeStr = data[i][3]; 
             if (timeStr instanceof Date) {
                timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
+            } else {
+               timeStr = String(timeStr).substring(0, 5);
             }
 
             results.push({
