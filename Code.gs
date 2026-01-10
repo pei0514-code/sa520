@@ -15,13 +15,14 @@ function doPost(e) {
           member: getMemberByLineId(lineUserId),
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
-          slotSettings: getSlotSettings(), // Updated to return map of time slots
+          slotSettings: getSlotSettings(), 
           bookingsSummary: getBookingsSummary()
         };
         break;
       case 'register': result = registerMember(params); break;
       case 'booking': result = saveBooking(params); break;
       case 'updateBooking': result = updateBooking(params); break;
+      case 'cancelBooking': result = cancelBooking(params); break;
       case 'findBooking': result = findBooking(params); break;
       case 'updateMember': result = updateMember(params); break;
       case 'deleteMember': result = deleteMember(params); break;
@@ -72,7 +73,7 @@ function getSheetDataAsJson(sheetName, headers) {
 
 function getUserDataByLineId(lineUserId, sheetName) {
     if (!lineUserId) return [];
-    var data = getSheetDataAsJson(sheetName, []); // Headers should already exist
+    var data = getSheetDataAsJson(sheetName, []);
     return data.filter(row => row['LINE ID'] === lineUserId);
 }
 
@@ -84,13 +85,9 @@ function getStampCardStatus(lineUserId) {
 }
 
 function getSlotSettings() {
-    // Expected Columns: 時段 (A), 可訂位人數 (B), 已訂位人數 (C), 剩餘空位 (D), 低消設定 (E)
-    // Note: C and D in the sheet are likely for display/manual entry if static, but the App calculates dynamic availability.
-    // The App reads A, B, and E to determine limits and rules.
     var sheet = getOrCreateSheet("系統設定", ["時段", "可訂位人數", "已訂位人數", "剩餘空位", "低消設定"]);
     var data = sheet.getDataRange().getValues();
     
-    // Initialize defaults if empty
     if (data.length <= 1) {
         var defaults = [
             ["11:00", 30, "", "", 180], ["11:30", 30, "", "", 180], ["12:00", 30, "", "", 180], 
@@ -106,11 +103,9 @@ function getSlotSettings() {
     var settings = {};
     for (var i = 1; i < data.length; i++) {
         var time = data[i][0];
-        // Ensure time is formatted correctly if coming from Sheet date object
         if (time instanceof Date) {
             time = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
         } else {
-             // Handle case like "11:00:00" string or just "11:00"
              time = String(time).substring(0, 5);
         }
         
@@ -127,21 +122,18 @@ function getBookingsSummary() {
     var data = sheet.getDataRange().getValues();
     var summary = [];
     
-    // Skip header
     for (var i = 1; i < data.length; i++) {
         var date = data[i][2];
         var time = data[i][3];
         var adults = Number(data[i][4]) || 0;
         var children = Number(data[i][5]) || 0;
         
-        // Simple date check: only summarize future dates or today
         var d = new Date(date);
         var today = new Date();
         today.setHours(0,0,0,0);
         
         if (d >= today) {
             var dateStr = d.toISOString().split('T')[0];
-            // Normalize time string from sheet
             var timeStr = time;
             if (time instanceof Date) {
                  timeStr = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
@@ -161,16 +153,14 @@ function findBooking(params) {
     var today = new Date();
     today.setHours(0,0,0,0);
 
-    // Skip header
     for (var i = 1; i < data.length; i++) {
         var rowDate = new Date(data[i][2]);
         var rowName = data[i][10];
-        var rowPhone = data[i][11];
+        var rowPhone = String(data[i][11]);
+        if (!rowPhone.startsWith('0') && rowPhone.length === 9) rowPhone = '0' + rowPhone;
         
-        // Match Name and Phone (exact match), and only future dates
         if (rowDate >= today && rowName == params.name && rowPhone == params.phone) {
             var dateStr = rowDate.toISOString().split('T')[0];
-            // Format time HH:mm
             var timeStr = data[i][3]; 
             if (timeStr instanceof Date) {
                timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
@@ -179,15 +169,13 @@ function findBooking(params) {
             }
 
             results.push({
-                id: i + 1, // Row number as ID
+                id: i + 1,
                 date: dateStr,
                 time: timeStr,
                 adults: data[i][4],
                 children: data[i][5],
                 highChairs: data[i][6],
                 vegetarian: data[i][7] === '是',
-                seating: data[i][8],
-                occasion: data[i][9],
                 name: rowName,
                 phone: rowPhone,
                 notes: data[i][12],
@@ -211,7 +199,7 @@ function registerMember(data) {
 
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
-  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', data.seating, data.occasion, data.name, data.phone, data.notes, '' ]);
+  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', "", "", data.name, data.phone, data.notes, '' ]);
   return { status: 'success', bookingId: sheet.getLastRow() };
 }
 
@@ -225,13 +213,22 @@ function updateBooking(data) {
         sheet.getRange(row, 6).setValue(data.children);
         sheet.getRange(row, 7).setValue(data.highChairs);
         sheet.getRange(row, 8).setValue(data.vegetarian ? '是' : '否');
-        sheet.getRange(row, 9).setValue(data.seating);
-        sheet.getRange(row, 10).setValue(data.occasion);
+        sheet.getRange(row, 9).setValue(""); // Clear Seating
+        sheet.getRange(row, 10).setValue(""); // Clear Occasion
         sheet.getRange(row, 11).setValue(data.name);
         sheet.getRange(row, 12).setValue(data.phone);
         sheet.getRange(row, 13).setValue(data.notes);
-        // Preorder is not wiped here, handled by savePreOrder
         return { status: 'success', bookingId: row };
+    }
+    return { status: 'error', message: '訂位資料找不到' };
+}
+
+function cancelBooking(data) {
+    var sheet = getOrCreateSheet("訂位紀錄");
+    var row = Number(data.bookingId);
+    if (row > 1 && row <= sheet.getLastRow()) {
+        sheet.deleteRow(row);
+        return { status: 'success' };
     }
     return { status: 'error', message: '訂位資料找不到' };
 }
@@ -244,10 +241,8 @@ function updateMember(data) {
       sheet.getRange(i + 1, 3).setValue(data.name);
       sheet.getRange(i + 1, 4).setValue(data.phone);
       sheet.getRange(i + 1, 5).setValue(data.birthday);
-      // Update gender and email if columns exist
       if (values[0].length > 6) sheet.getRange(i + 1, 7).setValue(data.gender);
       if (values[0].length > 7) sheet.getRange(i + 1, 8).setValue(data.email);
-      
       return { status: 'success', member: getMemberByLineId(data.lineUserId) };
     }
   }
@@ -294,9 +289,6 @@ function addPoints(lineUserId, points, reason) {
     }
 }
 
-// ========================
-// Utility Function
-// ========================
 function getOrCreateSheet(name, headers) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(name);
