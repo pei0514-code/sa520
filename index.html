@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>薩諾瓦義式廚房</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    :root {
+      --brand-green: #2c5e50;
+      --brand-red: #D32F2F;
+      --bg-color: #fcfbf9;
+    }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; 
+      background-color: var(--bg-color); 
+      color: #333; 
+    }
+    ::-webkit-scrollbar { width: 0px; background: transparent; }
+    .swal2-popup { font-family: inherit !important; border-radius: 1rem !important; }
+    .swal2-confirm { background-color: #2c5e50 !important; }
+    .swal2-styled.swal2-cancel { background-color: #718096 !important; }
+    .member-card-bg {
+        background-color: #1a1a1a;
+        background-image: url("https://www.transparenttextures.com/patterns/cubes.png");
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'italian-green': '#2c5e50',
+            'italian-red': '#D32F2F',
+            'italian-white': '#fcfbf9',
+            'italian-dark': '#1a3a32',
+            'gold-500': '#d4af37',
+            'gold-400': '#f3e5ab',
+          },
+          animation: {
+            'slide-up': 'slideUp 0.3s ease-out',
+            'fade-in': 'fadeIn 0.3s ease-out',
+          },
+          keyframes: {
+            slideUp: { '0%': { transform: 'translateY(100%)' }, '100%': { transform: 'translateY(0)' } },
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const LIFF_ID = "2008861231-EA0Hpl68";
+    const RESTAURANT_NAME = "薩諾瓦義式廚房";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHOJOzIGqCnW-ttjB0_OeJ6eIz3iqF3dnYSwGeK4L2vRi6dEuWZ-i_DoM5pHjz9u7PlA/exec";
+
+    // ================= 通訊與工具函式 =================
+    
+    const validatePhone = (phone) => /^09\d{8}$/.test(phone);
+    const showAlert = (title, text, icon = 'info') => Swal.fire({ title, text, icon, confirmButtonText: '確定', confirmButtonColor: '#2c5e50' });
+    const showConfirm = (title, text, confirmButtonText = '確定', cancelButtonText = '取消') => Swal.fire({ title, text, icon: 'question', showCancelButton: true, confirmButtonText, cancelButtonText, confirmButtonColor: '#2c5e50' });
+
+    const runGoogleScript = async (action, params = {}) => {
+      const payload = { action, ...params };
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('GAS Error:', error);
+        return { status: 'error', message: '連線失敗' };
+      }
+    };
+
+    // Icon 元件
+    const Icon = ({ name, className }) => {
+      const icons = {
+        menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+        calendar: <path d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 0V2m-14 2V2" />,
+        map: <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />,
+        user: <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 11a4 4 0 100-8 4 4 0 000 8z" />,
+        gift: <path d="M20 12v10H4V12 M2 7h20v5H2z M12 22V7 M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z" />,
+        chat: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />,
+        x: <path d="M18 6L6 18M6 6l12 12" />,
+        chevronLeft: <path d="M15 19l-7-7 7-7" />,
+        phone: <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />,
+        barcode: <path d="M3 5h2v14H3V5zm4 0h1v14H7V5zm3 0h2v14h-2V5zm4 0h1v14h-1V5zm3 0h2v14h-2V5zm4 0h2v14h-2V5z" />,
+        download: <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />,
+        plus: <path d="M12 4v16m8-8H4" />,
+        minus: <path d="M20 12H4" />,
+        cake: <path d="M21 16v2a4 4 0 01-4 4H7a4 4 0 01-4-4v-2c0-.55.45-1 1-1h16c.55 0 1 .45 1 1zm-1-5a2 2 0 11-4 0 2 2 0 014 0zm-8 0a2 2 0 11-4 0 2 2 0 014 0zm8-6a2 2 0 01-2 2h-1.5a2 2 0 01-2-2V4a1 1 0 011-1h2.5a1 1 0 011 1v1zm-8 0a2 2 0 01-2 2H7.5a2 2 0 01-2-2V4a1 1 0 011-1h2.5a1 1 0 011 1v1z" />,
+        star: <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />,
+        clock: <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
+        edit: <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      };
+      return (<svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={icons[name] || ''} /></svg>);
+    };
+
+    // ================= 元件區 =================
+    
+    // 1. MenuView
+    const MenuView = ({ onBack }) => {
+      const [selectedImg, setSelectedImg] = useState(null);
+      const images = [{ src: "https://i.ibb.co/QFTKgJ1B/2023-03-25.webp", title: "菜單正面" }, { src: "https://i.ibb.co/hJ6cfgjM/2025-12-28.webp", title: "菜單背面" }];
+      return (<div className="flex flex-col h-full bg-white animate-fade-in"><div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md"><button onClick={onBack} className="mr-3"><Icon name="chevronLeft" className="w-6 h-6" /></button><h2 className="text-lg font-bold">精選菜單</h2></div><div className="flex-1 overflow-y-auto p-4 space-y-6">{images.map((img, i) => (<div key={i} onClick={() => setSelectedImg(img.src)} className="rounded-xl overflow-hidden shadow-lg border border-gray-100 cursor-pointer"><img src={img.src} className="w-full h-auto" /></div>))}</div>{selectedImg && (<div onClick={() => setSelectedImg(null)} className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 animate-fade-in"><img src={selectedImg} className="max-w-full max-h-full object-contain" /></div>)}</div>);
+    };
+
+    // 2. LocationView
+    const LocationView = ({ onBack }) => (
+      <div className="flex flex-col h-full bg-white animate-fade-in"><div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md"><button onClick={onBack} className="mr-3"><Icon name="chevronLeft" className="w-6 h-6" /></button><h2 className="text-lg font-bold">門市資訊</h2></div><div className="flex-1 overflow-y-auto"><iframe width="100%" height="256" frameBorder="0" style={{border:0}} src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3655.3340333316135!2d118.4140003!3d24.4444565!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x346b95b3a3a3a3a3%3A0x3a3a3a3a3a3a3a3a!2zODkxIOmHkeecgOa4v-mHkea5lueinuWkqueojuibi-S6jOaute3l-i5!5e0!3m2!1szh-TW!2stw" allowFullScreen></iframe><div className="p-6 space-y-6"><div className="flex items-start gap-4"><div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-italian-green shrink-0"><Icon name="map" className="w-6 h-6" /></div><div><h3 className="font-bold">地址</h3><p>金門縣金湖鎮太湖路二段3巷6號</p><a href="https://www.google.com/maps/search/?api=1&query=薩諾瓦義式廚房" target="_blank" className="text-italian-green underline">導航</a></div></div><div className="flex items-start gap-4"><div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-italian-green shrink-0"><Icon name="clock" className="w-6 h-6" /></div><div><h3 className="font-bold">營業時間</h3><p>週二至週日 (週一公休)<br/>11:00-14:00, 17:00-20:30</p></div></div><a href="tel:082332530" className="flex items-center justify-center gap-2 w-full bg-italian-dark text-white py-4 rounded-xl font-bold shadow-lg"><Icon name="phone" className="w-5 h-5" />撥打電話 082-332530</a></div></div></div>
+    );
+    
+    // 3. NewsView
+    const NewsView = ({ onBack, promotions }) => (
+      <div className="flex flex-col h-full bg-white animate-fade-in"><div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md"><button onClick={onBack} className="mr-3"><Icon name="chevronLeft" className="w-6 h-6" /></button><h2 className="text-lg font-bold">最新優惠</h2></div><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">{promotions && promotions.length > 0 ? promotions.map((p, i) => (<div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm"><img src={p.image} className="w-full h-40 object-cover" /><div className="p-4"><h3 className="font-bold text-lg">{p.title}</h3><p className="text-sm mt-2">{p.desc}</p></div></div>)) : <p>目前沒有活動</p>}</div></div>
+    );
+
+    // 4. MemberView
+    const MemberView = ({ onBack, member, onRegister, userProfile }) => {
+      const [regData, setRegData] = useState({ name: userProfile?.displayName || '', phone: '', birthday: '', gender: 'male', source: '', dietary: '' });
+      const [loading, setLoading] = useState(false);
+      const handleRegSubmit = async e => { e.preventDefault(); if (!validatePhone(regData.phone)) return showAlert('格式錯誤', '手機號碼必須是 09 開頭的 10 位數字'); setLoading(true); await onRegister(regData); setLoading(false); };
+      const showPOSBarcode = () => Swal.fire({ title: '會員條碼', html: '<div class="flex justify-center p-4 bg-white"><svg class="w-48 h-20" viewBox="0 0 100 50"><rect x="0" y="0" width="100" height="50" fill="white"/><path d="M5 5h2v40H5zm4 0h1v40H9zm3 0h2v40h-2zm4 0h1v40h-1zm3 0h2v40h-2zm4 0h2v40h-2zm5 0h1v40h-1zm3 0h2v40h-2zm4 0h1v40h-1zm3 0h3v40h-3zm5 0h1v40h-1zm3 0h2v40h-2z" fill="#000"/></svg></div><p class="mt-2 text-sm text-gray-500">請向櫃檯人員出示此條碼</p>', confirmButtonColor: '#2c5e50' });
+      return (<div className="flex flex-col h-full bg-gray-50 animate-fade-in"><div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md"><button onClick={onBack} className="mr-3"><Icon name="chevronLeft" className="w-6 h-6" /></button><h2 className="text-lg font-bold">會員中心</h2></div><div className="flex-1 overflow-y-auto p-6">{member ? (<div className="space-y-6"><div className="member-card-bg rounded-2xl p-6 text-white shadow-2xl relative overflow-hidden aspect-[1.58/1] flex flex-col justify-between border-gray-700"><div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div><div className="relative z-10 flex justify-between items-start"><div><div className="flex items-center gap-1 mb-1"><Icon name="star" className="w-4 h-4 text-gold-500" /><span className="text-xs text-gold-400 tracking-[0.2em] font-bold">VIP MEMBER</span></div><div className="font-serif italic text-2xl">{RESTAURANT_NAME}</div></div><div className="w-12 h-12 bg-gradient-to-br from-gold-400 to-gold-500 rounded-full flex items-center justify-center shadow-lg text-black/80"><Icon name="user" className="w-6 h-6" /></div></div><div className="relative z-10"><div className="flex items-end gap-2 mb-1"><span className="text-gold-400 text-xs">NO.</span><span className="font-mono text-lg tracking-widest">{member.phone}</span></div><div className="text-xl font-medium uppercase">{member.name}</div></div></div><div className="bg-white rounded-2xl p-6 shadow-sm"><div className="flex justify-between mb-4"><span className="text-gray-500">可用點數</span><button onClick={() => showAlert('點數兌換','點數可兌換餐點或折抵消費。')} className="text-xs text-italian-green underline">兌換說明</button></div><div className="text-4xl font-bold mb-6">{member.points} <span className="text-base font-normal">pts</span></div><button onClick={showPOSBarcode} className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Icon name="barcode" className="w-5 h-5" /> 會員條碼</button></div></div>) : (<div className="bg-white rounded-2xl shadow-lg p-6"><h3 className="font-bold text-xl text-center mb-6">歡迎加入會員</h3><form onSubmit={handleRegSubmit} className="space-y-4"><input type="text" placeholder="姓名 (必填)" required className="w-full p-3 bg-gray-50 rounded-xl" value={regData.name} onChange={e => setRegData({...regData, name: e.target.value})} /><input type="tel" placeholder="手機 09xxxxxxxx (必填)" required className="w-full p-3 bg-gray-50 rounded-xl" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} /><div className="relative bg-gradient-to-br from-pink-50 to-orange-50 border rounded-xl p-5 mt-4"><div className="flex items-start gap-4"><div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-italian-red shrink-0"><Icon name="cake" className="w-6 h-6" /></div><div className="flex-1"><h4 className="font-bold">壽星專屬好禮</h4><p className="text-xs text-gray-500 mb-3">填寫生日，生日當月送上精緻甜點！</p><input type="date" className="w-full bg-white border rounded-lg p-2" value={regData.birthday} onChange={e => setRegData({...regData, birthday: e.target.value})} /></div></div></div><button type="submit" disabled={loading} className="w-full bg-italian-green text-white py-4 rounded-xl font-bold mt-4">{loading ? '註冊中...' : '立即註冊'}</button></form></div>)}</div></div>);
+    };
+
+    // 5. FaqView
+    const FaqView = ({ onBack, faqs, onOpenChat }) => (
+      <div className="flex flex-col h-full bg-white animate-fade-in"><div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md"><button onClick={onBack} className="mr-3"><Icon name="chevronLeft" className="w-6 h-6" /></button><h2 className="text-lg font-bold">客服中心</h2></div><div className="flex-1 overflow-y-auto p-4"><div className="bg-gray-800 rounded-2xl p-6 text-white mb-8 flex items-center justify-between"><div className="pr-4"><h3 className="font-bold">有其他問題？</h3><p className="text-sm text-gray-300">AI 主廚 Luigi 線上服務</p></div><button onClick={onOpenChat} className="bg-white text-gray-900 px-4 py-3 rounded-xl font-bold text-sm">詢問主廚</button></div><h3 className="font-bold mb-4">常見問題</h3><div className="space-y-3">{faqs.map((f, i) => (<details key={i} className="group bg-white rounded-xl border"><summary className="flex justify-between items-center p-4 font-medium cursor-pointer">{f.q}<span className="transition group-open:rotate-180"><Icon name="chevronLeft" className="w-4 h-4 rotate-[-90deg]" /></span></summary><div className="p-4 text-sm border-t">{f.a}</div></details>))}</div></div></div>
+    );
+
+    // 6. BookingForm
+    const BookingForm = ({ onBack, member, userProfile, onSuccessWithData }) => {
+       const [step, setStep] = useState(1);
+       const [loading, setLoading] = useState(false);
+       const today = new Date().toISOString().split('T')[0];
+       const [formData, setFormData] = useState({ date: today, time: '18:00', adults: 2, children: 0, highChairs: 0, name: member?.name || userProfile?.displayName || '', phone: member?.phone || '', notes: '', lineUserId: userProfile?.userId || '' });
+       useEffect(() => { const s = localStorage.getItem('booking_user_info'); if(s){ const p = JSON.parse(s); setFormData(prev => ({...prev, name:member?.name||p.name||prev.name, phone:member?.phone||p.phone||prev.phone, adults:p.adults||2, children:p.children||0}));}}, [member]);
+       const Counter = ({ label, value, onChange, min = 0 }) => (<div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border"><span className="font-bold">{label}</span><div className="flex items-center gap-4"><button type="button" onClick={() => onChange(Math.max(min, value-1))} className="w-9 h-9 border rounded-full">-</button><span className="w-6 text-center font-bold text-xl">{value}</span><button type="button" onClick={() => onChange(Math.min(20, value+1))} className="w-9 h-9 bg-italian-green text-white rounded-full">+</button></div></div>);
+       const handleSubmit = async e => { e.preventDefault(); if (!validatePhone(formData.phone)) return showAlert('格式錯誤','手機號碼需為09開頭10碼'); setLoading(true); const res = await runGoogleScript('booking', formData); setLoading(false); if (res.status === 'success') { localStorage.setItem('booking_user_info', JSON.stringify({ name: formData.name, phone: formData.phone, adults: formData.adults, children: formData.children })); onSuccessWithData(formData); } else { showAlert('失敗', res.message); }};
+       const timeSlots = ['11:00','11:30','12:00','12:30','13:00','17:00','17:30','18:00','18:30','19:00','19:30','20:00'];
+       return (<div className="flex flex-col h-full bg-white animate-fade-in"><div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md"><button onClick={onBack} className="mr-3"><Icon name="chevronLeft" className="w-6 h-6"/></button><h2 className="text-lg font-bold">立即訂位</h2></div><div className="flex-1 overflow-y-auto p-6"><form onSubmit={handleSubmit} className="space-y-6">{step === 1 ? (<div className="space-y-6 animate-slide-up"><div><label className="flex items-center gap-2 mb-2"><Icon name="calendar" className="w-4 h-4"/> 日期</label><input type="date" min={today} className="w-full p-4 border rounded-xl" value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} required/></div><div><label className="flex items-center gap-2 mb-2"><Icon name="clock" className="w-4 h-4"/> 時間</label><div className="grid grid-cols-3 gap-2">{timeSlots.map(t=>(<button type="button" key={t} onClick={()=>setFormData({...formData,time:t})} className={`py-3 rounded-xl border ${formData.time===t ? 'bg-italian-green text-white':'bg-white'}`}>{t}</button>))}</div></div><div className="space-y-3"><label className="flex items-center gap-2"><Icon name="user" className="w-4 h-4"/> 人數與需求</label><Counter label="大人" value={formData.adults} onChange={v=>setFormData({...formData,adults:v})} min={1}/><Counter label="小孩" value={formData.children} onChange={v=>setFormData({...formData,children:v})}/>{formData.children>0&&(<div className="flex justify-between items-center bg-orange-50 p-4 rounded-xl"><span className="font-bold">需要兒童椅</span><div className="flex items-center gap-3"><input type="checkbox" className="w-5 h-5 accent-orange-500" checked={formData.highChairs>0} onChange={e=>setFormData({...formData,highChairs:e.target.checked?1:0})}/>{formData.highChairs>0&&(<select className="bg-white border rounded-lg p-1" value={formData.highChairs} onChange={e=>setFormData({...formData,highChairs:parseInt(e.target.value)})}>{[...Array(formData.children).keys()].map(i=><option key={i+1} value={i+1}>{i+1} 張</option>)}</select>)}</div></div>)}</div><button type="button" onClick={()=>setStep(2)} className="w-full bg-italian-green text-white py-4 rounded-xl font-bold mt-4">下一步</button></div>) : (<div className="space-y-5 animate-slide-up"><div className="bg-gray-50 p-4 rounded-xl space-y-2"><div className="flex justify-between"><span className="font-bold">時間</span><span>{formData.date} {formData.time}</span></div><div className="flex justify-between"><span className="font-bold">人數</span><span>{formData.adults}大 {formData.children}小</span></div></div><div className="relative"><div className="absolute left-4 top-4 text-gray-400"><Icon name="user" className="w-5 h-5"/></div><input type="text" placeholder="訂位大名" required className="w-full pl-12 p-4 border rounded-xl" value={formData.name} onChange={e=>setFormData({...formData,name:e.target.value})}/></div><div className="relative"><div className="absolute left-4 top-4 text-gray-400"><Icon name="phone" className="w-5 h-5"/></div><input type="tel" placeholder="聯絡電話" required className="w-full pl-12 p-4 border rounded-xl" value={formData.phone} onChange={e=>setFormData({...formData,phone:e.target.value})}/></div><div className="relative"><div className="absolute left-4 top-4 text-gray-400"><Icon name="edit" className="w-5 h-5"/></div><textarea placeholder="其他備註..." rows="3" className="w-full pl-12 p-4 border rounded-xl" value={formData.notes} onChange={e=>setFormData({...formData,notes:e.target.value})}/></div><div className="flex gap-3 pt-2"><button type="button" onClick={()=>setStep(1)} className="flex-1 bg-gray-100 py-4 rounded-xl font-bold">重選</button><button type="submit" disabled={loading} className="flex-[2] bg-italian-red text-white py-4 rounded-xl font-bold">{loading?'處理中...':'確認預約'}</button></div></div>)}</form></div></div>);
+    };
+
+    // 7. ChatOverlay
+    const ChatOverlay = ({ onClose }) => {
+      const [msgs, setMsgs] = useState([{role:'model', text:'Ciao! 我是主廚 Luigi。有什麼我可以幫您的嗎？'}]);
+      const [input, setInput] = useState('');
+      const [typing, setTyping] = useState(false);
+      const endRef = useRef(null);
+      useEffect(() => endRef.current?.scrollIntoView({behavior:'smooth'}), [msgs]);
+      const send = async () => { if(!input.trim()) return; setMsgs(p => [...p, {role:'user', text:input}]); setInput(''); setTyping(true); const res = await runGoogleScript('chat', {message:input}); setMsgs(p => [...p, {role:'model', text:res.reply||'系統忙線中'}]); setTyping(false); };
+      return (<div className="fixed inset-0 z-50 bg-white flex flex-col animate-slide-up"><div className="bg-italian-green text-white p-4 flex justify-between items-center shadow"><div className="flex items-center gap-3"><img src="https://ui-avatars.com/api/?name=Luigi&background=random" className="w-10 h-10 rounded-full" /><div><div className="font-bold">主廚 Luigi</div><div className="text-xs text-green-200">● 線上</div></div></div><button onClick={onClose}><Icon name="x" className="w-6 h-6" /></button></div><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">{msgs.map((m,i)=>(<div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'}`}><div className={`max-w-[80%] p-3 rounded-2xl shadow-sm ${m.role==='user'?'bg-italian-green text-white rounded-tr-none':'bg-white border rounded-tl-none'}`}>{m.text}</div></div>))}{typing && <div className="text-xs text-gray-400">主廚正在思考...</div>}<div ref={endRef} /></div><div className="p-3 bg-white border-t flex gap-2"><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} className="flex-1 bg-gray-100 rounded-full px-4 py-2" placeholder="輸入訊息..."/><button onClick={send} className="w-10 h-10 bg-italian-red text-white rounded-full flex items-center justify-center shadow"><Icon name="chevronLeft" className="w-5 h-5 rotate-180"/></button></div></div>);
+    };
+
+    // 8. PreorderView
+    const PreorderView = ({ onSuccess, onCancel }) => {
+      const [activeCategory, setActiveCategory] = useState("PIZZA (7吋)");
+      const [cart, setCart] = useState([]);
+      const [selectedItem, setSelectedItem] = useState(null);
+      const [qty, setQty] = useState(1);
+      const [noodle, setNoodle] = useState("正常 (直麵)");
+      const [setOption, setSetOption] = useState("無");
+      const menuData = {"PIZZA (7吋)":[{name:"蕃茄田園時蔬披薩 (蛋奶素)",price:170},{name:"南瓜田園時蔬披薩 (蛋奶素)",price:160},{name:"義式肉醬野菇披薩 (含牛肉)",price:160},{name:"燻雞綜合菌菇披薩",price:160},{name:"(辣)墨西哥辣味香腸披薩",price:180},],"白醬義大利麵":[{name:"奶油培根義大利麵",price:170},{name:"奶油時蔬義大利麵 (蛋奶素)",price:170},], "茄汁義大利麵":[{name:"波隆那肉醬義大利麵 (含牛肉)",price:170},], "青醬義大利麵":[{name:"羅勒野菇義大利麵",price:180},], "主廚推薦":[{name:"蒜香白酒蛤蠣義大利麵",price:240},], "單點小品":[{name:"美式脆薯",price:90},],"飲品":[{name:"可樂",price:50}]};
+      const canChooseNoodle = cat => cat.includes("義大利麵") || cat.includes("主廚推薦");
+      const canUpgradeSet = cat => !["單點小品", "飲品"].includes(cat);
+      const openItemModal = item => { setSelectedItem(item); setQty(1); setNoodle("正常 (直麵)"); setSetOption("無"); };
+      const addToCart = () => { if (!selectedItem) return; let extras = 0; if (noodle.includes("(+10)")) extras+=10; if (noodle.includes("(+40)")) extras+=40; if (setOption.includes("+79")) extras+=79; if (setOption.includes("+129")) extras+=129; const newItem = { id:Date.now(), category:activeCategory, name:selectedItem.name, price:selectedItem.price, quantity:qty, noodleType:canChooseNoodle(activeCategory)?noodle:undefined, setOption:canUpgradeSet(activeCategory)?setOption:undefined, totalPrice:(selectedItem.price+extras)*qty }; setCart(p=>[...p, newItem]); setSelectedItem(null); Swal.mixin({toast:true,position:'top-end',showConfirmButton:false,timer:1500}).fire({icon:'success',title:'已加入購物車'}); };
+      const calculateTotal = () => cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      const confirmOrder = () => { if (cart.length === 0) return; showConfirm('確認送出訂單？',`總金額: $${calculateTotal()}`).then(res => { if(res.isConfirmed) onSuccess(cart); }); };
+      const cleanName = name => name.replace(/\(辣\)/g,'').replace(/\(蛋奶素\)/g,'').replace(/\(含牛肉\)/g,'').trim();
+      return (<div className="fixed inset-0 bg-gray-50 z-50 flex flex-col animate-slide-up"><div className="bg-italian-green text-white p-4 flex justify-between"><h2 className="text-lg font-bold">預先點餐</h2><button onClick={onCancel} className="text-sm">跳過</button></div><div className="bg-white border-b overflow-x-auto whitespace-nowrap p-2 no-scrollbar">{Object.keys(menuData).map(c=>(<button key={c} onClick={()=>setActiveCategory(c)} className={`px-4 py-2 mx-1 rounded-full text-sm ${activeCategory===c?'bg-italian-green text-white':'bg-gray-100'}`}>{c}</button>))}</div><div className="flex-1 overflow-y-auto p-4 pb-32"><div className="grid gap-4">{menuData[activeCategory].map((item,i)=>(<div key={i} onClick={()=>openItemModal(item)} className="bg-white p-4 rounded-xl border flex justify-between items-center"><div><div className="font-bold">{cleanName(item.name)}</div><div className="text-italian-red font-bold">${item.price}</div></div><button className="w-8 h-8 bg-italian-green text-white rounded-full">+</button></div>))}</div></div><div className="fixed bottom-0 w-full bg-white border-t p-4 pb-8">{cart.length>0?(<div><div className="flex justify-between mb-4"><span>已選 {cart.reduce((s,i)=>s+i.quantity,0)} 份</span><span className="font-bold">${calculateTotal()}</span></div><button onClick={confirmOrder} className="w-full bg-italian-dark text-white py-3 rounded-xl font-bold">確認點餐</button></div>):(<div className="text-center text-gray-400">尚未選擇餐點</div>)}</div>{selectedItem&&(<div className="fixed inset-0 z-[60] bg-black/50 flex items-end"><div className="bg-white w-full rounded-t-2xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"><h3 className="text-xl font-bold">{cleanName(selectedItem.name)}</h3><div className="text-lg mb-4">${selectedItem.price}</div><div className="space-y-6"><div className="flex justify-between items-center"><span>數量</span><div className="flex items-center gap-4"><button onClick={()=>setQty(Math.max(1,qty-1))} className="w-8 h-8 border rounded-full">-</button><span>{qty}</span><button onClick={()=>setQty(qty+1)} className="w-8 h-8 bg-gray-100 rounded-full">+</button></div></div>{canChooseNoodle(activeCategory)&&(<div><div className="font-bold mb-2">麵條</div><div className="grid grid-cols-2 gap-2">{["正常 (直麵)","筆尖麵","燉飯","天使細麵 (+10)","通心麵 (+10)","墨魚麵 (+40)"].map(o=>(<button key={o} onClick={()=>setNoodle(o)} className={`py-2 px-3 text-sm rounded-lg border ${noodle===o?'border-italian-green bg-green-50':''}`}>{o}</button>))}</div></div>)}{canUpgradeSet(activeCategory)&&(<div><div className="font-bold mb-2">套餐</div><div className="space-y-2">{["無","+79 超值套餐","+129 酥皮套餐"].map(o=>(<div key={o} onClick={()=>setSetOption(o)} className={`p-3 rounded-xl border flex items-center gap-3 ${setOption===o?'border-italian-green bg-green-50':''}`}><div className={`w-4 h-4 rounded-full border ${setOption===o?'bg-italian-green':''}`}></div><span>{o}</span></div>))}</div></div></div><div className="flex gap-3 mt-8"><button onClick={()=>setSelectedItem(null)} className="flex-1 py-3 bg-gray-100 rounded-xl">取消</button><button onClick={addToCart} className="flex-[2] py-3 bg-italian-green text-white rounded-xl">加入購物車</button></div></div></div>)}</div>);
+    };
+
+    // ================= 主 App =================
+
+    const App = () => {
+      const [view, setView] = useState('HOME');
+      const [showChat, setShowChat] = useState(false);
+      const [loading, setLoading] = useState(true);
+      const [profile, setProfile] = useState(null);
+      const [member, setMember] = useState(null);
+      const [data, setData] = useState({ faqs: [], promotions: [] });
+      const [tempBookingInfo, setTempBookingInfo] = useState(null);
+
+      useEffect(() => {
+        const init = async () => {
+           setLoading(true);
+           let p = null;
+           try {
+             if (window.liff) { await window.liff.init({ liffId: LIFF_ID }); if (window.liff.isLoggedIn()) p = await window.liff.getProfile(); }
+           } catch(e) { console.error('LIFF Error', e); }
+           setProfile(p);
+           const initialData = await runGoogleScript('getInitialData', { lineUserId: p?.userId });
+           if(initialData.status === 'success') { setMember(initialData.member); setData({ faqs: initialData.faqs, promotions: initialData.promotions }); }
+           setLoading(false);
+        };
+        init();
+      }, []);
+
+      const handleRegisterSuccess = (newMember) => {
+         setMember(newMember); setView('HOME'); showAlert('註冊成功', '恭喜加入！已獲得 100 點購物金。', 'success');
+      };
+
+      const handleBookingSuccess = (bookingDetails) => {
+        setTempBookingInfo(bookingDetails);
+        showConfirm('訂位成功！', '是否要現在預先點餐？這能大幅減少您的等候時間。', '是，我要預點', '不用了，謝謝')
+          .then(result => setView(result.isConfirmed ? 'PREORDER' : 'SUCCESS'));
+      };
+
+      const handlePreorderSuccess = async (orderItems) => {
+        setLoading(true);
+        const payload = { ...tempBookingInfo, items: orderItems, totalAmount: orderItems.reduce((s, i) => s + i.totalPrice, 0), lineUserId: profile?.userId };
+        const result = await runGoogleScript('preorder', payload);
+        setLoading(false);
+        if (result.status === 'success') {
+           try { if (window.liff && window.liff.isInClient()) { const itemsText = orderItems.map(i => `- ${i.name} ${i.noodleType||''} x${i.quantity}`).join('\n'); const msg = `【預點餐單確認】\n訂位人：${tempBookingInfo.name}\n日期：${tempBookingInfo.date} ${tempBookingInfo.time}\n\n${itemsText}\n\n總金額：$${payload.totalAmount}`; await window.liff.sendMessages([{type:'text', text:msg}]); }} catch(e) {}
+           setView('SUCCESS');
+        } else { showAlert('預點失敗', result.message, 'error'); }
+      };
+      
+      const checkMemberAndRedirect = (targetView) => {
+        if (member) setView(targetView); else showConfirm('會員限定功能', '線上訂位僅開放給會員使用，是否立即免費註冊？').then(res => res.isConfirmed && setView('MEMBER'));
+      };
+
+      if (loading) return (<div className="fixed inset-0 flex items-center justify-center"><div className="w-10 h-10 border-4 border-t-italian-green rounded-full animate-spin"></div></div>);
+
+      const renderView = () => {
+        switch(view) {
+          case 'MENU': return <MenuView onBack={() => setView('HOME')} />;
+          case 'LOCATION': return <LocationView onBack={() => setView('HOME')} />;
+          case 'NEWS': return <NewsView onBack={() => setView('HOME')} promotions={data.promotions} />;
+          case 'MEMBER': return <MemberView onBack={() => setView('HOME')} member={member} onRegister={handleRegisterSuccess} userProfile={profile} />;
+          case 'FAQ': return <FaqView onBack={() => setView('HOME')} faqs={data.faqs} onOpenChat={() => setShowChat(true)} />;
+          case 'BOOKING': return <BookingForm onBack={() => setView('HOME')} member={member} userProfile={profile} onSuccessWithData={handleBookingSuccess} />;
+          case 'PREORDER': return <PreorderView onSuccess={handlePreorderSuccess} onCancel={() => setView('SUCCESS')} />;
+          case 'SUCCESS': return (
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-fade-in">
+              <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 text-italian-green"><svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+              <h2 className="text-3xl font-bold mb-2">Grazie! 感謝您</h2>
+              <p className="text-gray-500 mb-8">我們已收到您的資訊，期待您的光臨。</p>
+              <button onClick={() => setView('HOME')} className="w-full bg-italian-dark text-white py-3 rounded-xl font-bold">返回首頁</button>
+            </div>
+          );
+          default: return (
+            <div className="h-full flex flex-col bg-gray-50 animate-fade-in">
+              <div className="fixed top-0 w-full max-w-md bg-white/90 backdrop-blur-sm shadow-sm z-40 h-14 flex items-center justify-between px-4">
+                <div className="font-bold text-xl">{RESTAURANT_NAME}</div>
+                <div className="text-xs px-2 py-1 rounded bg-gray-100">{profile?.displayName ? `Hi, ${profile.displayName}` : '歡迎光臨'}</div>
+              </div>
+              <div className="relative h-60 mt-14"><img src="https://i.ibb.co/qLFg7gSk/Gemini-Generated-Image-cmj4yzcmj4yzcmj4.png" className="w-full h-full object-cover opacity-80" /><div className="absolute inset-0 bg-gradient-to-t from-gray-900"></div><div className="absolute bottom-8 left-6 text-white"><h1 className="text-3xl font-bold">{RESTAURANT_NAME}</h1><p className="text-sm">金門最道地的義式家庭料理</p></div></div>
+              <div className="flex-1 -mt-6 rounded-t-3xl bg-white p-6 shadow-lg z-10 flex flex-col"><div className="grid grid-cols-2 gap-4 flex-1 content-start">{[{v:'MENU',n:'線上菜單',i:'menu',c:'orange'},{v:'BOOKING',n:'立即訂位',i:'calendar',c:'green'},{v:'LOCATION',n:'門市資訊',i:'map',c:'blue'},{v:'MEMBER',n:'會員中心',i:'user',c:'purple',b:!member},{v:'NEWS',n:'最新優惠',i:'gift',c:'red'},{v:'FAQ',n:'客服中心',i:'chat',c:'gray'}].map(b=>(<button key={b.v} onClick={()=>b.v==='BOOKING'?checkMemberAndRedirect('BOOKING'):setView(b.v)} className={`bg-${b.c}-50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 h-32 relative`}><div className={`w-12 h-12 bg-white rounded-full flex items-center justify-center text-${b.c}-500`}><Icon name={b.i} className="w-6 h-6"/></div><span>{b.n}</span>{b.b&&<div className="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>}</button>))}</div><div className="text-center mt-6 text-xs text-gray-400">© 2024 {RESTAURANT_NAME}</div></div>
+            </div>
+          );
+        }
+      };
+
+      return (
+        <div className="relative min-h-screen bg-white max-w-md mx-auto shadow-2xl overflow-hidden h-screen flex flex-col">
+          <div className="flex-1 overflow-hidden relative">{renderView()}</div>
+          {showChat && <ChatOverlay onClose={() => setShowChat(false)} />}
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
