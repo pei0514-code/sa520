@@ -14,9 +14,7 @@ var MENU_CONTEXT = `
 // ================= HTTP 請求處理 (API) =================
 
 function doGet(e) {
-  if (e.parameter && e.parameter.action) {
-    return handleApiRequest(e.parameter);
-  }
+  // 處理 GET 請求，主要用於提供前端 HTML
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
     .setTitle(RESTAURANT_NAME + ' 訂位系統')
@@ -25,6 +23,7 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  // 處理 POST 請求，用於前端的 API 呼叫
   try {
     var params = JSON.parse(e.postData.contents);
     return handleApiRequest(params);
@@ -45,7 +44,7 @@ function handleApiRequest(params) {
     result = saveBooking(params);
   } else if (action === 'chat') {
     result = callChefAI(params.message);
-  } else if (action === 'preorder') { // 新增預點餐處理
+  } else if (action === 'preorder') {
     result = savePreorder(params);
   } else {
     result = { status: 'error', message: 'Unknown action' };
@@ -81,7 +80,7 @@ function getPromotionsList() {
     var data = sheet.getDataRange().getValues();
     var promos = [];
 
-    if (data.length <= 1) {
+    if (data.length <= 1) { // 如果沒有資料，加入預設值
       var defaults = [
         [1, "歡慶APP啟動", "全面加入會員，完成會員任務即贈送薯條一份！趕快邀請朋友一起來薩諾瓦相聚。", "https://images.unsplash.com/photo-1573080496987-a199f8cd4058?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", "限時活動"],
         [2, "會員積點送", "加入會員即贈送 100 點購物金，點數可用於兌換商品，讓您越吃越划算。", "https://images.unsplash.com/photo-1552566626-52f8b828add9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", "長期活動"]
@@ -92,13 +91,7 @@ function getPromotionsList() {
 
     for (var i = 1; i < data.length; i++) {
       if (data[i][1]) {
-        promos.push({
-          id: data[i][0],
-          title: data[i][1],
-          desc: data[i][2],
-          image: data[i][3],
-          validUntil: data[i][4]
-        });
+        promos.push({ id: data[i][0], title: data[i][1], desc: data[i][2], image: data[i][3], validUntil: data[i][4] });
       }
     }
     return promos;
@@ -111,15 +104,12 @@ function registerMember(data) {
   var lock = LockService.getScriptLock();
   if (lock.tryLock(10000)) {
     try {
-      if (!data.name || !data.phone) {
-        return { status: 'error', message: '姓名與電話為必填' };
-      }
+      if (!data.name || !data.phone) return { status: 'error', message: '姓名與電話為必填' };
+      
       var headers = ["建立時間", "LINE ID", "姓名", "電話", "生日", "性別", "信箱", "地址", "點數", "得知管道", "飲食偏好"];
       var sheet = getOrCreateSheet("會員資料", headers);
       
-      if (data.lineUserId && getMemberByLineId(data.lineUserId)) {
-        return { status: 'error', message: '您已經是會員了' };
-      }
+      if (data.lineUserId && getMemberByLineId(data.lineUserId)) return { status: 'error', message: '您已經是會員了' };
 
       var initialPoints = 100;
       var dateStr = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
@@ -130,18 +120,14 @@ function registerMember(data) {
         data.source || '', data.dietary || ''
       ]);
 
-      return { 
-        status: 'success', 
-        member: { name: data.name, points: initialPoints, phone: data.phone, birthday: data.birthday }
-      };
+      return { status: 'success', member: { name: data.name, points: initialPoints, phone: data.phone, birthday: data.birthday } };
     } catch (e) {
       return { status: 'error', message: "系統錯誤: " + e.toString() };
     } finally {
       lock.releaseLock();
     }
-  } else {
-    return { status: 'error', message: "系統繁忙，請稍後再試" };
   }
+  return { status: 'error', message: "系統繁忙，請稍後再試" };
 }
 
 function saveBooking(data) {
@@ -164,9 +150,8 @@ function saveBooking(data) {
     } finally {
       lock.releaseLock();
     }
-  } else {
-    return { status: 'error', message: "系統繁忙，請稍後再試" };
   }
+  return { status: 'error', message: "系統繁忙，請稍後再試" };
 }
 
 function savePreorder(data) {
@@ -177,15 +162,12 @@ function savePreorder(data) {
       var sheet = getOrCreateSheet("預點訂單", headers);
       var dateStr = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       
-      var itemsStr = "";
-      if (data.items && Array.isArray(data.items)) {
-        itemsStr = data.items.map(function(item) {
-          var detail = item.name + " x" + item.quantity;
-          if (item.noodleType && item.noodleType !== "正常 (直麵)") detail += " [" + item.noodleType + "]";
-          if (item.setOption && item.setOption !== "無") detail += " [" + item.setOption + "]";
-          return detail;
-        }).join("\n");
-      }
+      var itemsStr = (data.items || []).map(function(item) {
+        var detail = item.name + " x" + item.quantity;
+        if (item.noodleType && item.noodleType !== "正常 (直麵)") detail += " [" + item.noodleType + "]";
+        if (item.setOption && item.setOption !== "無") detail += " [" + item.setOption + "]";
+        return detail;
+      }).join("\n");
 
       sheet.appendRow([
         dateStr, String(data.name), String(data.phone), String(data.bookingDate),
@@ -198,15 +180,13 @@ function savePreorder(data) {
     } finally {
       lock.releaseLock();
     }
-  } else {
-    return { status: 'error', message: "系統繁忙，請稍後再試" };
   }
+  return { status: 'error', message: "系統繁忙，請稍後再試" };
 }
 
 function callChefAI(userMessage) {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_GEMINI_API_KEY')) {
-    return { status: 'success', reply: "Mi scusi! 主廚現在在忙。請稍後再試。" };
-  }
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('AIzaSyC')) return { status: 'success', reply: "Mi scusi! 主廚現在在忙。請稍後再試。" };
+  
   var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_API_KEY;
   var payload = {
     "contents": [{ "parts": [{ "text": MENU_CONTEXT + "\n\nUser: " + userMessage }] }],
@@ -217,10 +197,7 @@ function callChefAI(userMessage) {
   try {
     var response = UrlFetchApp.fetch(url, options);
     var json = JSON.parse(response.getContentText());
-    var reply = "Mamma mia! 我好像聽不太懂。";
-    if (json.candidates && json.candidates.length > 0 && json.candidates[0].content.parts.length > 0) {
-      reply = json.candidates[0].content.parts[0].text;
-    }
+    var reply = (json.candidates && json.candidates[0].content.parts[0].text) || "Mamma mia! 我好像聽不太懂。";
     return { status: 'success', reply: reply };
   } catch (e) {
     return { status: 'success', reply: "Scusi, 網路連線有點問題。" };
@@ -234,11 +211,9 @@ function getMemberByLineId(lineUserId) {
   try {
     var sheet = getOrCreateSheet("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "性別", "信箱", "地址", "點數"]);
     var data = sheet.getDataRange().getValues();
-    for (var i = data.length - 1; i > 0; i--) { // 從後往前找，找到最新的
+    for (var i = data.length - 1; i > 0; i--) { // 從後往前找
       if (String(data[i][1]) === String(lineUserId)) {
-        return {
-          name: data[i][2], phone: data[i][3], birthday: data[i][4], points: data[i][8] || 0
-        };
+        return { name: data[i][2], phone: data[i][3], birthday: data[i][4], points: data[i][8] || 0 };
       }
     }
   } catch (e) { }
@@ -261,9 +236,7 @@ function getFaqList() {
       data = sheet.getDataRange().getValues();
     }
     for (var i = 1; i < data.length; i++) {
-      if (data[i][0] && data[i][1]) {
-        faqs.push({ q: data[i][0], a: data[i][1] });
-      }
+      if (data[i][0] && data[i][1]) faqs.push({ q: data[i][0], a: data[i][1] });
     }
     return faqs;
   } catch (e) { return []; }
@@ -274,9 +247,7 @@ function getOrCreateSheet(sheetName, headers) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
-    if (headers && headers.length > 0) {
-      sheet.appendRow(headers);
-    }
+    if (headers && headers.length > 0) sheet.appendRow(headers);
   }
   return sheet;
 }
