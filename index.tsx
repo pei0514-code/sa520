@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 
 // 讓 TypeScript 知道這些是從 index.html 的 <script> 標籤載入的全域變數
 declare const Swal: any;
-// FIX: Add liff to the window object to fix TypeScript errors when accessing `window.liff`.
 declare global {
   interface Window {
     liff: any;
@@ -81,7 +80,6 @@ const Icon = ({ name, className }: { name: string; className: string }) => {
 
 // ================= 元件區 =================
 
-// 1. 線上菜單
 const MenuView = ({ onBack }: { onBack: () => void }) => {
   const [selectedImg, setSelectedImg] = useState<string | null>(null);
   const images = [
@@ -129,7 +127,6 @@ const MenuView = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
-// 2. 門市資訊
 const LocationView = ({ onBack }: { onBack: () => void }) => (
   <div className="flex flex-col h-full bg-white animate-fade-in">
     <div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md">
@@ -151,7 +148,6 @@ const LocationView = ({ onBack }: { onBack: () => void }) => (
   </div>
 );
 
-// 3. 最新優惠
 const NewsView = ({ onBack, promotions }: { onBack: () => void, promotions: any[] }) => (
   <div className="flex flex-col h-full bg-white animate-fade-in">
     <div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md">
@@ -175,7 +171,6 @@ const NewsView = ({ onBack, promotions }: { onBack: () => void, promotions: any[
   </div>
 );
 
-// 4. 會員中心
 const MemberView = ({ onBack, member, onRegister, userProfile }: { onBack: () => void, member: any, onRegister: (member: any) => void, userProfile: any }) => {
   const [regData, setRegData] = useState({ 
     name: userProfile?.displayName || '', phone: '', birthday: '', gender: 'male', email: '', address: '',
@@ -275,7 +270,6 @@ const MemberView = ({ onBack, member, onRegister, userProfile }: { onBack: () =>
   );
 };
 
-// 5. 常見問題
 const FaqView = ({ onBack, faqs, onOpenChat }: { onBack: () => void, faqs: any[], onOpenChat: () => void }) => (
   <div className="flex flex-col h-full bg-white animate-fade-in">
      <div className="bg-italian-green text-white p-4 flex items-center sticky top-0 z-10 shadow-md">
@@ -300,7 +294,6 @@ const FaqView = ({ onBack, faqs, onOpenChat }: { onBack: () => void, faqs: any[]
   </div>
 );
 
-// 6. 訂位表單
 const BookingForm = ({ onBack, member, userProfile }: { onBack: () => void, member: any, userProfile: any }) => {
    const [step, setStep] = useState(1);
    const [loading, setLoading] = useState(false);
@@ -406,7 +399,6 @@ const BookingForm = ({ onBack, member, userProfile }: { onBack: () => void, memb
    );
 };
 
-// 7. Chat 元件
 const ChatOverlay = ({ onClose }: { onClose: () => void }) => {
   const [msgs, setMsgs] = useState([{role:'model', text:'Ciao! 我是主廚 Luigi。有什麼我可以幫您的嗎？'}]);
   const [input, setInput] = useState('');
@@ -455,12 +447,16 @@ const App = () => {
     const init = async () => {
        setLoading(true);
        let p = null;
-       try {
-         if (window.liff) {
+       // **THE FIX IS HERE**
+       // Only attempt to use `liff` if it's available on the window object.
+       if (window.liff) {
+         try {
            await window.liff.init({ liffId: LIFF_ID });
            if (window.liff.isLoggedIn()) p = await window.liff.getProfile();
+         } catch(e) { 
+           console.error('LIFF Error', e); 
          }
-       } catch(e) { console.error('LIFF Error', e); }
+       }
        setProfile(p);
        const initialData = await runGoogleScript('getInitialData', { lineUserId: p?.userId || '' });
        if(initialData.status === 'success') setData(initialData);
@@ -533,5 +529,5 @@ const App = () => {
   );
 };
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(<App />);
