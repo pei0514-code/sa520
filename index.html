@@ -45,7 +45,7 @@
     import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
 
     const LIFF_ID = "2008861231-EA0Hpl68";
-    const RESTAURANT_NAME = "薩諾瓦義式廚房";
+    const RESTAURANT_NAME = "薩諾瓦訂位系統 Ver1.0"; // Updated Name
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHOJOzIGqCnW-ttjB0_OeJ6eIz3iqF3dnYSwGeK4L2vRi6dEuWZ-i_DoM5pHjz9u7PlA/exec";
 
     const runGAS = async (action, params = {}) => {
@@ -64,7 +64,7 @@
     const Icon = ({ name, className }) => {
       const paths = {
         menu: "M4 6h16M4 12h16M4 18h16",
-        calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+        calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
         map: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z",
         user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
         gift: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7",
@@ -95,7 +95,11 @@
     const App = () => {
       const [view, setView] = useState('HOME');
       const [loading, setLoading] = useState(true);
-      const [data, setData] = useState({ member: null, faqs: [], promotions: [], slotSettings: {}, bookingsSummary: [], chefRecommendations: [], restaurantMenu: [] });
+      const [data, setData] = useState({ 
+        member: null, faqs: [], promotions: [], slotSettings: {}, 
+        bookingsSummary: [], chefRecommendations: [], restaurantMenu: [],
+        seatInventory: [] // New state for precise seat tracking
+      });
       const [profile, setProfile] = useState(null);
       const [currentBooking, setCurrentBooking] = useState(null);
       
@@ -192,7 +196,7 @@
       return React.createElement("div", { className: "flex flex-col h-full bg-[#f8fafc]" },
         React.createElement("div", { className: "bg-white p-5 sticky top-0 z-10 flex justify-between items-center shadow-sm h-18 shrink-0" },
           React.createElement("div", null,
-             React.createElement("p", { className: "text-xs text-gray-400 font-bold uppercase tracking-wider" }, RESTAURANT_NAME),
+             React.createElement("p", { className: "text-xs text-gray-400 font-bold uppercase tracking-wider" }, RESTAURANT_NAME), // Updated Title
              React.createElement("h1", { className: "font-bold text-[#B91C1C] text-lg" }, 
                 profile?.displayName ? `${profile.displayName}, 您好` : "Welcome"
              )
@@ -230,14 +234,12 @@
     );
     };
     
+    // ... MenuView remains same ...
     const MenuView = ({ chefRecommendations }) => {
         const [modalItem, setModalItem] = useState(null);
         const [dishModal, setDishModal] = useState(null);
         const [tab, setTab] = useState('FEATURED');
-        
         const dishes = (chefRecommendations && chefRecommendations.length > 0) ? chefRecommendations : [];
-
-        // Updated images
         const menuItems = [
             { src: "https://i.ibb.co/XZQx4dWc/S-36053013-0.jpg", full: "https://i.ibb.co/TDV3qsnx/2025-page-0001.jpg", label: "菜單正面", filename: "sanova-menu-front.webp" },
             { src: "https://i.ibb.co/dsdPtQKN/S-36053012-0.jpg", full: "https://i.ibb.co/dCKyZ74/2025-page-0002.jpg", label: "菜單背面", filename: "sanova-menu-back.webp" }
@@ -327,329 +329,603 @@
         );
     };
 
-    // MyBookingsView - Fix date parsing issues
-    const MyBookingsView = ({ profile }) => {
-        const [bookings, setBookings] = useState([]);
-        const [loading, setLoading] = useState(true);
-        useEffect(() => {
-            if(!profile) return;
-            runGAS('getUserBookings', { lineUserId: profile.userId })
-                .then(res => {
-                    if (res.status === 'success') setBookings(res.bookings.reverse());
-                })
-                .finally(() => setLoading(false));
-        }, [profile]);
-
-        if (loading) return React.createElement("p", {className: "text-center p-8"}, "讀取中...");
-        if (bookings.length === 0) return React.createElement("p", {className: "text-center text-gray-500 p-8"}, "您目前沒有任何訂位紀錄。");
-
-        return React.createElement("div", {className: "p-4 space-y-4"},
-            bookings.map((b, i) => {
-                // Safer date handling
-                let dateDisplay = b['預約日期'];
-                try {
-                    const dateObj = new Date(b['預約日期']);
-                    if (!isNaN(dateObj.getTime())) {
-                        dateDisplay = dateObj.toLocaleDateString();
-                    }
-                } catch(e) {}
-
-                return React.createElement("div", {key: i, className: "bg-white p-4 rounded-xl shadow-sm border border-gray-100"},
-                    React.createElement("div", { className: "flex justify-between items-start" },
-                        React.createElement("div", null,
-                            React.createElement("div", { className: "flex items-center gap-2 mb-1" },
-                                React.createElement("span", { className: "text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono" }, b['訂位代號'] || '---'),
-                                React.createElement("p", {className: "font-bold text-lg text-gray-800"}, dateDisplay)
-                            ),
-                            React.createElement("p", {className: "text-[#B91C1C] font-bold"}, b['預約時間'])
-                        ),
-                        React.createElement("span", { className: "bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded" }, `${b['大人']}大${b['小孩']}小`)
-                    ),
-                    b['預點餐'] && React.createElement("div", {className: "mt-3 pt-3 border-t border-dashed border-gray-200"},
-                        React.createElement("p", {className: "text-xs text-gray-500 mb-1"}, "預點餐點"),
-                        React.createElement("p", {className: "text-sm text-gray-700 whitespace-pre-wrap"}, b['預點餐'].replace(/;/g, '\n'))
-                    )
-                );
-            })
+    const LocationView = ({ profile }) => {
+        // Feedback moved to MemberView
+        return React.createElement("div", { className: "p-6 space-y-6 pb-24" },
+            React.createElement("iframe", { 
+                src: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3637.373403565137!2d118.42103517593254!3d24.43813957833075!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x34152b1b31278881%3A0xb355205561237a3!2z6JOu6K2v55m-576p5byD55m-5a625Yqq5aSn5Yip6aSQ5bqr!5e0!3m2!1szh-TW!2stw!4v1709400000000!5m2!1szh-TW!2stw", 
+                className: "w-full h-64 rounded-xl border-0 shadow-md", allowFullScreen: "", loading: "lazy", referrerPolicy: "no-referrer-when-downgrade" 
+            }),
+            React.createElement("div", { className: "space-y-4" },
+                React.createElement("div", { className: "flex gap-4 items-start" }, React.createElement(Icon, { name: "map", className: "w-6 h-6 text-[#B91C1C] shrink-0 mt-1" }), React.createElement("div", null, React.createElement("h4", { className: "font-bold" }, "餐廳地址"), React.createElement("p", { className: "text-gray-600" }, "金門縣金湖鎮太湖路二段3巷6號"))),
+                React.createElement("div", { className: "flex gap-4 items-start" }, React.createElement(Icon, { name: "phone", className: "w-6 h-6 text-[#B91C1C] shrink-0 mt-1" }), React.createElement("div", null, React.createElement("h4", { className: "font-bold" }, "聯絡電話"), React.createElement("p", { className: "text-gray-600" }, "082-332530")))
+            ),
+             React.createElement("div", { className: "bg-blue-50 p-4 rounded-xl border border-blue-200" },
+                React.createElement("h4", { className: "font-bold text-gray-800 mb-2" }, "交通資訊"),
+                React.createElement("p", { className: "text-sm text-gray-600" }, "🚗 附近有昇恆昌地下停車場，步行約2分鐘。"),
+                React.createElement("p", { className: "text-sm text-gray-600 mt-1" }, "🚌 可搭乘公車至「太湖站」，步行約3分鐘。")
+            ),
+            React.createElement("a", { href: "tel:082-332530", className: "fixed bottom-6 left-6 right-6 z-20 bg-[#B91C1C] text-white py-4 rounded-xl font-bold shadow-xl shadow-red-200 flex justify-center items-center gap-2 transition-all active:scale-95" },
+                React.createElement(Icon, { name: "phone", className: "w-5 h-5" }),
+                "撥打訂位專線"
+            )
         );
     };
 
-    // PreorderView - Completely Overhauled
-    const PreorderView = ({ booking, restaurantMenu, onBack }) => {
-        // Initial Mock Data (Fallback) based on the user's provided list
-        // This structure allows for the complex logic requested.
-        const fallbackMenu = [
-            { category: "義大利麵", sub: "主廚推薦", n: "宮保辣味雞丁義大利麵", p: 0 }, 
-            { category: "義大利麵", sub: "主廚推薦", n: "極品X.O醬海鮮義大利麵", p: 250, special: true },
-            { category: "義大利麵", sub: "主廚推薦", n: "墨魚汁海鮮墨魚麵", p: 260, special: true },
-            { category: "義大利麵", sub: "白醬", n: "奶油培根義大利麵", p: 170 },
-            { category: "義大利麵", sub: "白醬", n: "奶油蛤蜊義大利麵", p: 220 },
-            { category: "義大利麵", sub: "茄汁", n: "波隆那肉醬義大利麵", p: 170, tags: ['牛'] },
-            { category: "義式燉飯", sub: "基本款", n: "南瓜時蔬燉飯", p: 180, tags: ['素'] },
-            { category: "PIZZA", sub: "", n: "義式肉醬野菇披薩", p: 160, tags: ['牛'] },
-            { category: "單點", sub: "炸物", n: "麥克雞塊", p: 80 },
-            { category: "飲品", sub: "", n: "可樂", p: 50 },
-        ];
+    // ... NewsView, FaqView remain same ...
+    const NewsView = ({ promotions }) => {
+        const [filter, setFilter] = useState('ALL');
+        const filtered = filter === 'ALL' ? promotions : promotions.filter(p => p['類型'] === filter);
+        return React.createElement("div", { className: "flex flex-col h-full" },
+             React.createElement("div", { className: "flex p-4 gap-2 overflow-x-auto no-scrollbar bg-white shadow-sm sticky top-0 z-10" },
+                ['ALL', '活動', '優惠'].map(t => React.createElement("button", { key: t, onClick: () => setFilter(t), className: `px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${filter === t ? 'bg-[#B91C1C] text-white' : 'bg-gray-100 text-gray-600'}` }, t === 'ALL' ? '全部' : t))
+             ),
+             React.createElement("div", { className: "p-4 space-y-4 flex-1 overflow-y-auto" },
+                !filtered || filtered.length === 0 ? React.createElement("p", {className: "text-center text-gray-500 mt-8"}, "目前沒有相關內容。") :
+                filtered.map((p, i) => React.createElement("div", { key: i, className: "bg-white rounded-xl shadow-md border overflow-hidden" },
+                    p['圖片網址'] && React.createElement("img", { src: p['圖片網址'], className: "w-full h-44 object-cover" }),
+                    React.createElement("div", { className: "p-4" },
+                        p['類型'] === '活動' && React.createElement("div", { className: "text-sm text-red-600 font-bold mb-1 flex items-center gap-1" }, React.createElement(Icon, {name:"calendar", className:"w-4 h-4"}), `活動日期：${new Date(p['活動日期']).toLocaleDateString()}`),
+                        React.createElement("h3", { className: "font-bold text-[#B91C1C]" }, p['標題']),
+                        React.createElement("p", { className: "text-sm text-gray-500 mt-1" }, p['內容']),
+                         p['類型'] === '優惠' && React.createElement("button", { onClick: () => Swal.fire('已領取', '優惠券已存入您的票夾', 'success'), className: "mt-3 w-full border border-[#B91C1C] text-[#B91C1C] py-2 rounded-lg text-sm font-bold hover:bg-red-50" }, "領取優惠券")
+                    )
+                ))
+            )
+        );
+    };
 
-        // Process menu data: prefer props.restaurantMenu, fallback to mock if empty
-        const menuItems = (restaurantMenu && restaurantMenu.length > 0) 
-            ? restaurantMenu.map(i => ({ category: i['類別'], sub: i['子類別'], n: i['產品名稱'], p: Number(i['產品價格']), img: i['圖片網址'], tags: i['標籤'] ? i['標籤'].split(',') : [] })) 
-            : fallbackMenu;
+    const FaqView = ({ faqs }) => (
+        React.createElement("div", { className: "p-4 space-y-3" },
+          !faqs || faqs.length === 0 ? React.createElement("p", {className: "text-center text-gray-500 mt-8"}, "目前沒有常見問題。") :
+          faqs.map((f, i) => React.createElement("details", { key: i, className: "bg-gray-50 rounded-xl border p-4 group" }, 
+            React.createElement("summary", { className: "font-bold cursor-pointer flex justify-between items-center" }, f.問題, React.createElement(Icon, { name: "back", className: "w-4 h-4 -rotate-90 group-open:rotate-90 transition-transform" })), 
+            React.createElement("p", { className: "text-sm text-gray-600 mt-2 pt-2 border-t" }, f.回答)
+          ))
+        )
+    );
 
-        const categories = ["義大利麵", "義式燉飯", "焗烤", "PIZZA", "單點", "飲品"];
-        const [activeCategory, setActiveCategory] = useState(categories[0]);
-        const [cart, setCart] = useState([]);
-        const [showCartModal, setShowCartModal] = useState(false);
-        const [selectedItem, setSelectedItem] = useState(null); // Item for detail modal
+    const BookingView = ({ member, profile, data, onBack, onBookingSuccess }) => {
+        const [mode, setMode] = useState('CREATE');
+        const today = new Date();
+        const [viewMonth, setViewMonth] = useState(today.toISOString().slice(0, 7));
+        const [form, setForm] = useState({ 
+            date: '', // Default to empty to force selection
+            time: '', adults: 2, children: 0, highChairs: 0, 
+            name: member?.name || profile?.displayName || '', 
+            phone: member?.phone || '', notes: '', vegetarian: false, 
+            bookingId: null, preOrder: ''
+        });
+        
+        const [searchForm, setSearchForm] = useState(() => {
+            if (member && member.電話) {
+                return { name: member.姓名 || '', phone: member.電話.replace(/'/g, '') };
+            }
+            try {
+                const saved = localStorage.getItem('booking_search_info');
+                if (saved) return JSON.parse(saved);
+            } catch(e) {}
+            return { name: member?.name || profile?.displayName || '', phone: '' };
+        });
 
-        // Item Modal State
-        const [itemOptions, setItemOptions] = useState({ noodle: '筆尖麵', spice: '不辣', combo: 0, drink: '' });
+        useEffect(() => {
+            if (member && member.電話) {
+                setSearchForm(prev => ({ 
+                    ...prev, 
+                    phone: member.電話.replace(/'/g, ''),
+                    name: member.姓名 || prev.name
+                }));
+            }
+        }, [member]);
 
-        const noodleOptions = [
-            { n: "筆尖麵", p: 0 }, { n: "天使細麵", p: 10 }, { n: "通心麵", p: 10 }, { n: "細扁麵", p: 10 }, { n: "墨魚麵", p: 40 }
-        ];
-        const spiceOptions = ["不辣", "小辣", "中辣", "大辣"];
-        const comboOptions = [
-            { id: 0, n: "單點", p: 0 },
-            { id: 1, n: "超值套餐", p: 80, desc: "含飲品" },
-            { id: 2, n: "酥皮套餐", p: 130, desc: "含飲品+酥皮濃湯" }
-        ];
-        const drinkOptions = menuItems.filter(i => i.category === "飲品").map(i => i.n);
+        const [searchResults, setSearchResults] = useState([]);
+        const [submitting, setSubmitting] = useState(false);
+        const slotSettings = data.slotSettings || {};
 
-        // Open Modal
-        const openItemModal = (item) => {
-            setSelectedItem(item);
-            // Default options
-            setItemOptions({ 
-                noodle: (item.category === "義大利麵") ? '筆尖麵' : '', 
-                spice: '不辣', 
-                combo: 0, 
-                drink: '' 
+        const daysInMonth = useMemo(() => {
+            const [y, m] = viewMonth.split('-').map(Number);
+            const dates = [];
+            const days = new Date(y, m, 0).getDate();
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0,0,0,0);
+
+            for(let i = 1; i <= days; i++) {
+                const d = new Date(y, m - 1, i);
+                if (d >= tomorrow && d.getDay() !== 1) { 
+                     dates.push(d);
+                }
+            }
+            return dates;
+        }, [viewMonth]);
+
+        useEffect(() => {
+            localStorage.setItem('booking_search_info', JSON.stringify(searchForm));
+        }, [searchForm]);
+
+        // Updated getSlotInfo to use the precise seatInventory from backend
+        const getSlotInfo = (time) => {
+            const defaultMax = slotSettings[time] ? slotSettings[time].max : 30;
+            
+            // Check if there is specific inventory data for this date and time
+            if (form.date && data.seatInventory) {
+                const inventory = data.seatInventory.find(
+                    item => {
+                        // Handle date format comparison carefully
+                        const itemDate = new Date(item['日期']).toISOString().split('T')[0];
+                        const itemTime = String(item['時段']).substring(0, 5);
+                        return itemDate === form.date && itemTime === time;
+                    }
+                );
+                
+                if (inventory) {
+                    return { 
+                        max: Number(inventory['可訂位人數']), 
+                        booked: Number(inventory['已訂位人數']), 
+                        remaining: Number(inventory['剩餘空位']) 
+                    };
+                }
+            }
+            
+            // Fallback to default if no specific inventory record exists (assume 0 booked)
+            return { max: defaultMax, booked: 0, remaining: defaultMax };
+        };
+
+        const totalPeople = form.adults + form.children;
+        const lunchSlots = ["11:00", "11:30", "12:00", "12:30", "13:00"];
+        const dinnerSlots = ["17:00", "17:30", "18:00", "18:30", "19:00", "19:30"];
+
+        const sendLineMessage = async (text) => {
+            if (window.liff.isInClient()) {
+                await window.liff.sendMessages([{ type: 'text', text: text }]).catch(err => console.error("Line msg error:", err));
+            }
+        };
+
+        const handleBooking = async e => {
+            e.preventDefault();
+            if (!form.date) {
+                Swal.fire({ icon: 'warning', title: '請選擇日期', text: '請點選行事曆上的日期', confirmButtonColor: '#D32F2F' });
+                return;
+            }
+            if (!form.time) {
+                Swal.fire({ icon: 'warning', title: '請選擇時間', text: '請點選下方的用餐時段', confirmButtonColor: '#D32F2F' });
+                return;
+            }
+            const phoneRegex = /^09\d{8}$/;
+            if (!phoneRegex.test(form.phone)) {
+                Swal.fire({ icon: 'error', title: '電話號碼格式錯誤', text: '請輸入有效的 10 位手機號碼，必須以 09 開頭。', confirmButtonColor: '#D32F2F' });
+                return;
+            }
+            
+            setSubmitting(true);
+            const action = mode === 'EDIT' ? 'updateBooking' : 'booking';
+            const res = await runGAS(action, { ...form, lineUserId: profile?.userId });
+            
+            if (res.status === 'success') {
+                const bookingCode = res.bookingCode || '查詢中';
+                const msg = mode === 'EDIT' 
+                    ? `📝 薩諾瓦訂位修改確認：\n訂位代號：${bookingCode}\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n您的訂位已更新！`
+                    : `🔔 薩諾瓦訂位確認：\n訂位代號：${bookingCode}\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n我們會盡快為您確認位置！`;
+                
+                Swal.fire({
+                    title: mode === 'EDIT' ? '修改成功！' : '預約成功！',
+                    html: `訂位代號：<b>${bookingCode}</b><br>已發送訊息至官方帳號。<br><br><b>請問需要${mode === 'EDIT' ? '修改' : ''}預先點餐嗎？</b>`,
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: '前往點餐',
+                    cancelButtonText: '完成',
+                    confirmButtonColor: '#B91C1C',
+                    cancelButtonColor: '#6e7881',
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        onBookingSuccess({
+                            bookingId: res.bookingId, 
+                            adults: form.adults, 
+                            children: form.children,
+                            preOrder: form.preOrder,
+                            bookingMessageText: msg 
+                        });
+                    } else {
+                        await sendLineMessage(msg);
+                        onBack();
+                    }
+                });
+            } else {
+                Swal.fire({ icon: 'error', title: '失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+            }
+            setSubmitting(false);
+        };
+
+        // ... handleQuickCancel, handleCancel, handleSearch, handleEditClick ...
+        const handleQuickCancel = async (bookingId, info) => {
+            Swal.fire({
+                title: '確定取消訂位?',
+                text: `${info.date} ${info.time} 的訂位將被取消且無法復原。`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#D32F2F',
+                confirmButtonText: '確認取消',
+                cancelButtonText: '保留'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    setSubmitting(true);
+                    const res = await runGAS('cancelBooking', { bookingId: bookingId, date: info.date, time: info.time, adults: info.adults, children: info.children });
+                    setSubmitting(false);
+                    if (res.status === 'success') {
+                        await sendLineMessage(`❌ 薩諾瓦訂位取消：\n訂位代號：${info.bookingCode}\n日期：${info.date}\n時間：${info.time}\n姓名：${info.name}\n電話：${info.phone}\n您的訂位已取消。`);
+                        Swal.fire('已取消', '您的訂位已成功取消。', 'success');
+                        handleSearch(new Event('submit'));
+                    } else {
+                        Swal.fire({ icon: 'error', title: '取消失敗', text: res.message });
+                    }
+                }
             });
         };
 
-        const addToCartFromModal = () => {
-            if (itemOptions.combo > 0 && !itemOptions.drink) {
-                Swal.fire({ icon: 'warning', title: '請選擇飲料', text: '套餐必須選擇飲品', confirmButtonColor: '#B91C1C' });
-                return;
-            }
-
-            const itemTotal = selectedItem.p + (itemOptions.combo === 1 ? 80 : itemOptions.combo === 2 ? 130 : 0) + (noodleOptions.find(n=>n.n === itemOptions.noodle)?.p || 0);
-            
-            const newItem = {
-                ...selectedItem,
-                ...itemOptions,
-                unitPrice: itemTotal,
-                qty: 1,
-                cartId: Date.now() // Unique ID for cart item (distinguish same product with diff options)
-            };
-
-            setCart(prev => [...prev, newItem]);
-            setSelectedItem(null);
-            Swal.fire({ icon: 'success', title: '已加入購物車', showConfirmButton: false, timer: 800 });
+        const handleCancel = async () => { 
+             handleQuickCancel(form.bookingId, form);
         };
 
-        const removeFromCart = (cartId) => {
-            setCart(prev => prev.filter(i => i.cartId !== cartId));
-        };
-
-        const total = useMemo(() => cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0), [cart]);
-        
-        // Low Charge Calculation
-        const minChargePerPerson = 60;
-        const payingPeople = parseInt(booking?.adults) || 0; 
-        const requiredTotal = minChargePerPerson * payingPeople;
-
-        const handleSubmit = async () => {
-            if (total < requiredTotal) {
-                 Swal.fire({ 
-                     icon: 'warning', 
-                     title: '未達低消', 
-                     text: `每人低消 $${minChargePerPerson} (不含兒童)。\n目前計費人數 ${payingPeople} 人，總金額需達 $${requiredTotal}。\n還差 $${requiredTotal - total}。`, 
-                     confirmButtonColor: '#D32F2F' 
-                 });
-                 return;
-            }
-
-            const res = await runGAS('savePreOrder', { bookingId: booking.bookingId, order: cart });
-            if(res.status === 'success') {
-                if (window.liff.isInClient()) {
-                    const orderText = cart.map(i => {
-                        let desc = `${i.n}`;
-                        if(i.noodle) desc += `(${i.noodle})`;
-                        if(i.spice) desc += `[${i.spice}]`;
-                        if(i.combo) desc += `+${comboOptions.find(c=>c.id===i.combo).n}`;
-                        if(i.drink) desc += `/${i.drink}`;
-                        desc += ` x${i.qty}`;
-                        return desc;
-                    }).join('\n');
-                    
-                    const fullMessage = booking.bookingMessageText + `\n\n🍔 預點餐點確認：\n${orderText}\n\n預點金額：$${total}`;
-                    await window.liff.sendMessages([{ type: 'text', text: fullMessage }]).catch(console.error);
-                }
-                setShowCartModal(false);
-                await Swal.fire({ icon: 'success', title: '預先點餐成功', text: '您的點餐紀錄已儲存，期待您的光臨！', confirmButtonColor: '#B91C1C'});
-                onBack();
+        const handleSearch = async (e) => {
+            if(e) e.preventDefault();
+            setSubmitting(true);
+            const res = await runGAS('findBooking', searchForm);
+            setSubmitting(false);
+            if (res.status === 'success' && res.bookings.length > 0) {
+                setSearchResults(res.bookings);
             } else {
-                 Swal.fire({ icon: 'error', title: '點餐失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+                setSearchResults([]);
+                Swal.fire({ icon: 'info', title: '查無資料', text: '找不到符合的未來訂位紀錄。' });
             }
         };
 
-        const filteredItems = menuItems.filter(i => i.category === activeCategory);
-        // Group by subCategory (sauce) if Pasta/Risotto
-        const groupedItems = filteredItems.reduce((acc, item) => {
-            const key = item.sub || '其它';
-            if(!acc[key]) acc[key] = [];
-            acc[key].push(item);
-            return acc;
-        }, {});
+        const handleEditClick = (booking) => {
+            setForm({
+                date: booking.date, time: booking.time, adults: booking.adults, children: booking.children, highChairs: booking.highChairs,
+                name: booking.name, phone: booking.phone, notes: booking.notes, vegetarian: booking.vegetarian,
+                bookingId: booking.id, preOrder: booking.preOrder
+            });
+            setViewMonth(booking.date.slice(0, 7));
+            setMode('EDIT');
+        };
 
-        return React.createElement("div", { className: "flex h-full relative" },
-            /* Left Categories */
-            React.createElement("div", { className: "w-[26%] bg-gray-50 overflow-y-auto border-r border-gray-100 pb-24" },
-                categories.map(cat => React.createElement("button", { key: cat, onClick: () => setActiveCategory(cat), className: `w-full text-left px-2 py-4 text-xs font-bold transition-all border-l-4 ${activeCategory === cat ? 'bg-white text-[#B91C1C] border-[#B91C1C] shadow-sm' : 'text-gray-500 border-transparent hover:bg-gray-100'}` }, cat))
-            ),
-            /* Right Items */
-            React.createElement("div", { className: "w-[74%] p-4 overflow-y-auto pb-36 bg-white" },
-                React.createElement("div", { className: "bg-red-50 p-2 mb-4 rounded-lg text-[10px] text-red-700 font-bold border border-red-100 flex items-center gap-1" }, 
-                   React.createElement(Icon, {name:"info", className:"w-3 h-3"}), `低消提醒：共需 $${requiredTotal}`
-                ),
-                Object.keys(groupedItems).map(sub => 
-                    React.createElement("div", { key: sub, className: "mb-6" },
-                        sub !== '其它' && React.createElement("h4", { className: "font-bold text-gray-400 text-sm mb-2 sticky top-0 bg-white py-1" }, sub),
-                        React.createElement("div", { className: "space-y-3" },
-                            groupedItems[sub].map((item, idx) => 
-                                React.createElement("div", { key: idx, onClick: () => openItemModal(item), className: "flex bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden active:scale-95 transition-transform cursor-pointer" },
-                                    item.img && React.createElement("img", { src: item.img, className: "w-20 h-20 object-cover" }),
-                                    React.createElement("div", { className: "p-2 flex-1 flex flex-col justify-between" },
-                                        React.createElement("div", null,
-                                            React.createElement("p", { className: "font-bold text-gray-800 text-sm leading-tight" }, item.n),
-                                            React.createElement("div", { className: "flex gap-1 mt-1 flex-wrap" },
-                                                item.tags && item.tags.includes('辣') && React.createElement("span", { className: "text-[9px] bg-red-100 text-red-600 px-1 rounded" }, "🌶️"),
-                                                item.tags && item.tags.includes('牛') && React.createElement("span", { className: "text-[9px] bg-amber-100 text-amber-700 px-1 rounded" }, "🐮"),
-                                                item.tags && item.tags.includes('素') && React.createElement("span", { className: "text-[9px] bg-green-100 text-green-700 px-1 rounded" }, "🥦")
-                                            )
-                                        ),
-                                        React.createElement("div", { className: "flex justify-between items-end" },
-                                            React.createElement("p", { className: "font-bold text-[#B91C1C]" }, `$${item.p}`),
-                                            React.createElement("div", { className: "bg-[#B91C1C] text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-lg" }, "+")
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
+        const NumberInput = ({ label, value, onChange, min = 0, max = 99, disabled = false }) => {
+            const handleChange = (delta) => {
+                const newValue = value + delta;
+                if (newValue >= min && newValue <= max) onChange(newValue);
+            };
+            return React.createElement("div", { className: "flex-1 text-center" },
+                React.createElement("span", { className: "label-text text-center block" }, label),
+                React.createElement("div", { className: "flex items-center justify-center gap-3 mt-1" },
+                    React.createElement("button", { type: "button", onClick: () => handleChange(-1), disabled: disabled || value <= min, className: "w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-lg font-bold disabled:opacity-30 hover:bg-gray-200 transition-colors" }, "-"),
+                    React.createElement("span", { className: "text-lg font-bold w-6 text-center text-gray-800" }, value),
+                    React.createElement("button", { type: "button", onClick: () => handleChange(1), disabled: disabled || value >= max, className: "w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-lg font-bold disabled:opacity-30 hover:bg-gray-200 transition-colors" }, "+")
                 )
-            ),
-            /* Floating Cart Bar */
-            cart.length > 0 && !showCartModal && !selectedItem && React.createElement("div", { className: "fixed bottom-6 left-4 right-4 bg-[#B91C1C] text-white p-3 rounded-xl shadow-2xl z-30 flex justify-between items-center cursor-pointer active:scale-95 transition-transform animate-slide-up", onClick: () => setShowCartModal(true) },
-                React.createElement("div", { className: "flex items-center gap-3" },
-                    React.createElement("div", { className: "bg-white text-[#B91C1C] font-bold w-8 h-8 rounded-full flex items-center justify-center" }, cart.length),
-                    React.createElement("span", { className: "font-bold text-lg" }, `$${total}`)
-                ),
-                React.createElement("span", { className: "font-bold text-sm" }, "查看明細 >")
-            ),
-            /* Item Detail Modal (Selection) */
-            selectedItem && React.createElement("div", { className: "fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in" },
-                React.createElement("div", { className: "bg-white w-full max-h-[90vh] rounded-t-2xl shadow-2xl flex flex-col animate-slide-up overflow-hidden" },
-                    React.createElement("div", { className: "p-4 bg-gray-50 border-b flex justify-between items-start" },
-                        React.createElement("div", null,
-                            React.createElement("h3", { className: "font-bold text-lg text-gray-800" }, selectedItem.n),
-                            React.createElement("p", { className: "text-[#B91C1C] font-bold" }, `$${selectedItem.p}`)
-                        ),
-                        React.createElement("button", { onClick: () => setSelectedItem(null), className: "bg-gray-200 rounded-full p-1" }, React.createElement(Icon, {name:"close", className:"w-5 h-5"}))
-                    ),
-                    React.createElement("div", { className: "flex-1 overflow-y-auto p-4 space-y-6" },
-                        /* Noodle Selection */
-                        selectedItem.category === "義大利麵" && React.createElement("div", null,
-                            React.createElement("h4", { className: "font-bold text-sm mb-2 flex items-center gap-1" }, "選擇麵條", React.createElement("span", {className:"text-[10px] text-red-500"}, "*必選")),
-                            React.createElement("div", { className: "grid grid-cols-2 gap-2" },
-                                noodleOptions.map(opt => React.createElement("button", { 
-                                    key: opt.n, 
-                                    onClick: () => setItemOptions({...itemOptions, noodle: opt.n}),
-                                    className: `py-2 text-xs border rounded-lg ${itemOptions.noodle === opt.n ? 'bg-red-50 border-[#B91C1C] text-[#B91C1C] font-bold' : 'border-gray-200 text-gray-600'}` 
-                                }, `${opt.n} ${opt.p > 0 ? `(+$${opt.p})` : ''}`))
-                            )
-                        ),
-                        /* Spiciness */
-                        React.createElement("div", null,
-                            React.createElement("h4", { className: "font-bold text-sm mb-2" }, "辣度調整"),
-                            React.createElement("div", { className: "flex gap-2" },
-                                spiceOptions.map(s => React.createElement("button", { 
-                                    key: s, 
-                                    onClick: () => setItemOptions({...itemOptions, spice: s}),
-                                    className: `flex-1 py-2 text-xs border rounded-lg ${itemOptions.spice === s ? 'bg-red-50 border-[#B91C1C] text-[#B91C1C] font-bold' : 'border-gray-200 text-gray-600'}` 
-                                }, s))
-                            )
-                        ),
-                        /* Combo Upgrade */
-                        React.createElement("div", { className: "bg-yellow-50 p-3 rounded-xl border border-yellow-200" },
-                            React.createElement("h4", { className: "font-bold text-sm mb-2 text-yellow-800" }, "✨ 超值升級？"),
-                            React.createElement("div", { className: "space-y-2" },
-                                comboOptions.map(c => React.createElement("label", { key: c.id, className: "flex items-center justify-between p-2 bg-white rounded-lg border cursor-pointer" },
-                                    React.createElement("div", { className: "flex items-center gap-2" },
-                                        React.createElement("input", { type: "radio", name: "combo", checked: itemOptions.combo === c.id, onChange: () => setItemOptions({...itemOptions, combo: c.id, drink: ''}), className: "accent-[#B91C1C]" }),
-                                        React.createElement("div", null,
-                                            React.createElement("p", { className: "text-sm font-bold" }, c.n),
-                                            c.desc && React.createElement("p", { className: "text-[10px] text-gray-500" }, c.desc)
-                                        )
-                                    ),
-                                    React.createElement("span", { className: "text-xs font-bold text-[#B91C1C]" }, `+$${c.p}`)
-                                ))
-                            )
-                        ),
-                        /* Drink Selection (Conditional) */
-                        itemOptions.combo > 0 && React.createElement("div", { className: "animate-fade-in" },
-                            React.createElement("h4", { className: "font-bold text-sm mb-2 flex items-center gap-1" }, "選擇飲品", React.createElement("span", {className:"text-[10px] text-red-500"}, "*必選")),
-                            React.createElement("select", { 
-                                value: itemOptions.drink, 
-                                onChange: (e) => setItemOptions({...itemOptions, drink: e.target.value}),
-                                className: "w-full p-2 border border-gray-300 rounded-lg text-sm bg-white"
-                            },
-                                React.createElement("option", { value: "" }, "請選擇飲料..."),
-                                drinkOptions.map(d => React.createElement("option", { key: d, value: d }, d))
-                            )
-                        )
-                    ),
-                    React.createElement("div", { className: "p-4 border-t bg-white pb-safe" },
-                        React.createElement("button", { onClick: addToCartFromModal, className: "w-full bg-[#B91C1C] text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200 active:scale-95 transition-transform" }, "加入購物車")
-                    )
+            );
+        };
+
+        const DateCard = ({ date, isSelected, onSelect }) => {
+            const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+            return React.createElement("div", { 
+                onClick: onSelect,
+                className: `flex-shrink-0 w-16 h-20 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all border ${isSelected ? 'bg-[#B91C1C] text-white border-[#B91C1C] shadow-md transform scale-105' : 'bg-white text-gray-600 border-gray-200'}` 
+            },
+                React.createElement("span", { className: "text-xs font-bold mb-1" }, dayNames[date.getDay()]),
+                React.createElement("span", { className: "text-xl font-bold" }, date.getDate())
+            );
+        };
+
+        const TimeSlotButton = ({ time }) => {
+            const { remaining } = getSlotInfo(time);
+            const isFull = remaining < totalPeople;
+            const isSelected = form.time === time;
+            
+            return React.createElement("button", {
+                type: "button",
+                onClick: () => !isFull && setForm({...form, time}),
+                disabled: isFull,
+                className: `relative px-3 py-3 rounded-lg text-sm font-bold border transition-all flex flex-col items-center justify-center ${
+                    isFull ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' :
+                    isSelected ? 'bg-[#B91C1C] text-white border-[#B91C1C] shadow-md' :
+                    'bg-white text-gray-700 border-gray-200 hover:border-[#B91C1C]'
+                }`
+            }, 
+                React.createElement("span", null, time),
+                React.createElement("span", {className: `text-[10px] font-normal mt-0.5 ${isFull ? 'text-gray-400' : isSelected ? 'text-red-100' : 'text-gray-500'}`}, 
+                    isFull ? "客滿" : `剩${remaining}位`
                 )
-            ),
-            /* Cart Modal */
-            showCartModal && React.createElement("div", { className: "fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm animate-fade-in" },
-                React.createElement("div", { className: "bg-white w-full max-h-[85vh] rounded-t-3xl shadow-2xl flex flex-col animate-slide-up" },
-                    React.createElement("div", { className: "p-4 border-b border-gray-100 flex justify-between items-center" },
-                        React.createElement("h3", { className: "font-bold text-xl text-gray-800" }, "您的餐點"),
-                        React.createElement("button", { onClick: () => setShowCartModal(false), className: "p-2 bg-gray-100 rounded-full text-gray-600" }, React.createElement(Icon, {name: "chevronDown", className: "w-6 h-6"}))
-                    ),
-                    React.createElement("div", { className: "flex-1 overflow-y-auto p-4 space-y-4" },
-                        cart.map(item => React.createElement("div", { key: item.cartId, className: "flex justify-between items-start bg-white border-b border-gray-50 pb-2 last:border-0" },
-                            React.createElement("div", null, 
-                                React.createElement("p", { className: "font-bold text-gray-800" }, item.n), 
-                                React.createElement("div", { className: "text-xs text-gray-500 mt-1" },
-                                    item.noodle && React.createElement("span", {className:"mr-2"}, item.noodle),
-                                    item.spice && React.createElement("span", {className:"mr-2"}, item.spice),
-                                    item.combo > 0 && React.createElement("span", {className:"block text-[#B91C1C]"}, `+${comboOptions.find(c=>c.id===item.combo).n} (${item.drink})`)
-                                ),
-                                React.createElement("p", { className: "text-sm font-bold text-[#B91C1C] mt-1" }, `$${item.unitPrice}`)
+            );
+        };
+
+        if (mode === 'SEARCH') {
+             return React.createElement("div", { className: "p-6 space-y-6" },
+                React.createElement("div", { className: "flex gap-2 mb-4" },
+                    React.createElement("button", { onClick: () => setMode('CREATE'), className: "flex-1 py-2 text-center text-gray-500 font-bold bg-gray-100 rounded-lg" }, "我要訂位"),
+                    React.createElement("button", { className: "flex-1 py-2 text-center text-white font-bold bg-[#B91C1C] rounded-lg shadow" }, "查詢/修改/取消")
+                ),
+                React.createElement("form", { onSubmit: handleSearch, className: "bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4" },
+                    React.createElement("h3", { className: "font-bold text-gray-700" }, "查詢訂位紀錄"),
+                    React.createElement("input", { placeholder: "訂位姓名", className: "input-field", value: searchForm.name, onChange: e => setSearchForm({...searchForm, name: e.target.value}) }),
+                    React.createElement("input", { placeholder: "訂位電話", type: "tel", className: "input-field", value: searchForm.phone, onChange: e => setSearchForm({...searchForm, phone: e.target.value}) }),
+                    React.createElement("button", { disabled: submitting, className: "w-full bg-[#B91C1C] text-white py-3 rounded-xl font-bold" }, submitting ? "查詢中..." : "查詢")
+                ),
+                searchResults.length > 0 && React.createElement("div", { className: "space-y-4" },
+                    searchResults.map(res => React.createElement("div", { key: res.id, className: "bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3" },
+                        React.createElement("div", null,
+                            React.createElement("div", { className: "flex justify-between items-center" },
+                                React.createElement("p", { className: "font-bold text-lg" }, `${res.date} ${res.time}`),
+                                React.createElement("span", { className: "text-xs font-mono bg-gray-100 px-2 py-1 rounded" }, res.bookingCode)
                             ),
-                            React.createElement("button", { onClick: () => removeFromCart(item.cartId), className: "text-gray-400 p-2" }, React.createElement(Icon, {name:"trash", className:"w-4 h-4"}))
-                        ))
-                    ),
-                    React.createElement("div", { className: "p-4 border-t border-gray-100 bg-gray-50 pb-safe" },
-                        React.createElement("div", { className: "flex justify-between items-center mb-4" },
-                            React.createElement("span", { className: "text-gray-600 font-bold" }, "總金額"),
-                            React.createElement("div", { className: "text-right" },
-                                React.createElement("span", { className: `font-bold text-2xl ${total < requiredTotal ? 'text-red-500' : 'text-[#B91C1C]'}` }, `$${total}`),
-                                total < requiredTotal && React.createElement("p", { className: "text-xs text-red-500 font-bold" }, `(未達低消，差$${requiredTotal - total})`)
-                            )
+                            React.createElement("p", { className: "text-sm text-gray-600" }, `${res.adults}大 ${res.children}小`),
+                            res.preOrder && React.createElement("p", { className: "text-xs text-[#B91C1C] mt-1" }, `已點餐: ${res.preOrder}`)
                         ),
-                        React.createElement("button", { onClick: handleSubmit, className: `w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-all ${total < requiredTotal ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#B91C1C] shadow-red-200 active:scale-95'}` }, "確認預先點餐")
+                        React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+                            React.createElement("button", { onClick: () => handleEditClick(res), className: "bg-gray-100 text-gray-600 py-2 rounded-lg text-xs font-bold" }, "修改資料"),
+                            React.createElement("button", { onClick: () => onBookingSuccess({bookingId: res.id, adults: res.adults, children: res.children, preOrder: res.preOrder}), className: "bg-blue-50 text-blue-700 py-2 rounded-lg text-xs font-bold" }, "修改餐點"),
+                            React.createElement("button", { onClick: () => handleQuickCancel(res.id, res), className: "bg-red-50 text-[#B91C1C] py-2 rounded-lg text-xs font-bold" }, "取消訂位")
+                        )
+                    ))
+                )
+             );
+        }
+
+        return React.createElement("form", { onSubmit: handleBooking, className: "p-6 space-y-6 pb-24" },
+             mode !== 'EDIT' && React.createElement("div", { className: "flex flex-col gap-4 mb-2" },
+                React.createElement("div", { className: "flex gap-2" },
+                   React.createElement("button", { className: "flex-1 py-2 text-center text-white font-bold bg-[#B91C1C] rounded-lg shadow" }, "我要訂位"),
+                   React.createElement("button", { type: "button", onClick: () => setMode('SEARCH'), className: "flex-1 py-2 text-center text-gray-500 font-bold bg-gray-100 rounded-lg" }, "查詢/修改/取消")
+                )
+            ),
+            mode === 'EDIT' && React.createElement("div", { className: "bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-yellow-800 text-center font-bold mb-2" }, 
+                `正在修改 ${form.name} 的訂位`
+            ),
+            
+            // Time and Date
+            React.createElement("div", { className: "bg-white p-5 rounded-2xl shadow-sm border border-gray-100" },
+                React.createElement("h3", { className: "font-bold text-gray-700 mb-4 flex items-center gap-2" }, 
+                    React.createElement(Icon, { name: "calendar", className: "w-5 h-5 text-[#B91C1C]" }), "用餐時間"
+                ),
+                React.createElement("div", { className: "mb-4 flex items-center gap-4" }, 
+                    React.createElement("span", { className: "label-text whitespace-nowrap" }, "選擇月份"),
+                    React.createElement("input", { type: "month", value: viewMonth, min: new Date().toISOString().slice(0, 7), onChange: e => setViewMonth(e.target.value), className: "input-field py-2" })
+                ),
+                React.createElement("div", { className: "mb-2" }, React.createElement("span", { className: "label-text" }, "選擇日期 (週一公休)"), !form.date && React.createElement("span", { className: "text-xs text-red-500 font-bold ml-2 animate-pulse" }, "* 請選擇日期")),
+                React.createElement("div", { className: "flex overflow-x-auto gap-3 pb-4 no-scrollbar -mx-2 px-2" },
+                    daysInMonth.map(d => {
+                        const dateStr = d.toISOString().split('T')[0];
+                        return React.createElement(DateCard, { 
+                            key: dateStr, 
+                            date: d, 
+                            isSelected: form.date === dateStr, 
+                            onSelect: () => setForm({...form, date: dateStr, time: ''}) 
+                        });
+                    })
+                ),
+                React.createElement("div", { className: "mt-4 space-y-3" },
+                    React.createElement("span", { className: "label-text" }, "午餐時段"),
+                    React.createElement("div", { className: "grid grid-cols-5 gap-2" },
+                        lunchSlots.map(t => React.createElement(TimeSlotButton, { key: t, time: t }))
+                    ),
+                    React.createElement("span", { className: "label-text mt-2 block" }, "晚餐時段"),
+                    React.createElement("div", { className: "grid grid-cols-5 gap-2" },
+                        dinnerSlots.map(t => React.createElement(TimeSlotButton, { key: t, time: t }))
                     )
                 )
+            ),
+            // ... People and Contact inputs remain ...
+            React.createElement("div", { className: "bg-white p-5 rounded-2xl shadow-sm border border-gray-100" },
+                React.createElement("h3", { className: "font-bold text-gray-700 mb-4 flex items-center gap-2" }, React.createElement(Icon, { name: "user", className: "w-5 h-5 text-purple-600" }), "人數與需求"),
+                React.createElement("div", { className: "flex justify-between items-center mb-6" },
+                    React.createElement(NumberInput, { label: "大人", value: form.adults, onChange: (v) => setForm({ ...form, adults: v }), min: 1 }),
+                    React.createElement("div", { className: "w-px h-10 bg-gray-200" }),
+                    React.createElement(NumberInput, { label: "小孩", value: form.children, onChange: (v) => setForm({ ...form, children: v }) }),
+                    React.createElement("div", { className: "w-px h-10 bg-gray-200" }),
+                    React.createElement(NumberInput, { label: "兒童椅", value: form.highChairs, onChange: (v) => setForm({ ...form, highChairs: v }), max: form.children, disabled: form.children === 0 })
+                ),
+                 React.createElement("div", { className: "mt-4 flex items-center justify-between bg-gray-50 p-3 rounded-lg" },
+                    React.createElement("span", { className: "text-sm font-bold text-gray-600" }, "素食需求"),
+                    React.createElement("label", { className: "inline-flex items-center cursor-pointer" },
+                        React.createElement("input", { type: "checkbox", checked: form.vegetarian, onChange: (e) => setForm({...form, vegetarian: e.target.checked}), className: "sr-only peer" }),
+                        React.createElement("div", { className: "relative w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#B91C1C]" })
+                    )
+                 )
+            ),
+            React.createElement("div", { className: "bg-white p-5 rounded-2xl shadow-sm border border-gray-100" },
+                React.createElement("h3", { className: "font-bold text-gray-700 mb-4 flex items-center gap-2" }, React.createElement(Icon, { name: "phone", className: "w-5 h-5 text-blue-600" }), "聯絡資訊"),
+                React.createElement("div", { className: "space-y-4" },
+                    React.createElement("div", null, React.createElement("span", { className: "label-text" }, "聯絡姓名"), React.createElement("input", { className: "input-field", required: true, value: form.name, onChange: e => setForm({ ...form, name: e.target.value }) })),
+                    React.createElement("div", null, React.createElement("span", { className: "label-text" }, "聯絡電話"), React.createElement("input", { type: "tel", className: "input-field", required: true, value: form.phone, onChange: e => setForm({ ...form, phone: e.target.value }) })),
+                    React.createElement("div", null, React.createElement("span", { className: "label-text" }, "特殊需求備註"), React.createElement("textarea", { className: "input-field", rows: "2", value: form.notes, onChange: e => setForm({ ...form, notes: e.target.value }) }))
+                )
+            ),
+            React.createElement("p", {className: "text-xs text-center text-gray-400 px-4"}, "為確保服務品質，線上僅接受40人內訂位，若有其他需求請來電洽詢。"),
+            React.createElement("div", { className: "fixed bottom-6 left-6 right-6 z-20 flex gap-2" },
+                 mode === 'EDIT' && React.createElement("button", { type: "button", onClick: handleCancel, className: "flex-1 bg-gray-500 text-white py-4 rounded-xl font-bold shadow-xl transition-all active:scale-95" }, "取消訂位"),
+                 React.createElement("button", { type: "submit", disabled: submitting, className: "flex-[2] bg-[#B91C1C] text-white py-4 rounded-xl font-bold shadow-xl shadow-red-200 disabled:bg-gray-400 transition-all active:scale-95" }, submitting ? "處理中..." : (mode === 'EDIT' ? "確認修改" : "確認送出"))
             )
         );
+    };
+
+    const MemberView = ({ member, profile, onMemberUpdate, onMemberDelete, setView }) => {
+      const [isEditing, setIsEditing] = useState(false);
+      const [showFeedback, setShowFeedback] = useState(false);
+      const [rating, setRating] = useState(0);
+      const [comment, setComment] = useState("");
+      const [submittingFeedback, setSubmittingFeedback] = useState(false);
+      const [form, setForm] = useState(member || {});
+
+      const handleUpdate = async () => {
+        const res = await runGAS('updateMember', { ...form, lineUserId: profile?.userId });
+        if (res.status === 'success') {
+          onMemberUpdate(res.member);
+          setIsEditing(false);
+          Swal.fire({ icon: 'success', title: '更新成功', showConfirmButton: false, timer: 1500 });
+        } else {
+          Swal.fire({ icon: 'error', title: '更新失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+        }
+      };
+      
+      const handleDelete = async () => {
+        Swal.fire({
+          title: '確定要刪除會員嗎?',
+          text: "刪除後，您的點數與會員資料將無法復原！",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#D32F2F',
+          confirmButtonText: '確定刪除'
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            const res = await runGAS('deleteMember', { lineUserId: profile?.userId });
+            if (res.status === 'success') {
+              onMemberDelete();
+              Swal.fire('已刪除', '您的會員資料已成功刪除。', 'success');
+            }
+          }
+        })
+      };
+
+      const handleSubmitFeedback = async () => {
+            if (rating === 0) {
+                Swal.fire({ icon: 'warning', title: '請給星級評分', text: '請至少選擇一顆星', confirmButtonColor: '#D32F2F' });
+                return;
+            }
+            setSubmittingFeedback(true);
+            const res = await runGAS('submitFeedback', { lineUserId: profile?.userId, name: profile?.displayName, rating, comment });
+            if (res.status === 'success') {
+                Swal.fire('感謝您的回饋！', '您的意見是我們進步的動力', 'success');
+                setShowFeedback(false); setRating(0); setComment("");
+            } else {
+                Swal.fire({ icon: 'error', title: '提交失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+            }
+            setSubmittingFeedback(false);
+      };
+
+      // Registration Form ...
+      if (!member) {
+        const [regForm, setRegForm] = useState({ 
+            name: profile?.displayName || '', phone: '', birthday: '', gender: '男', email: profile?.email || '' 
+        });
+        const [submitting, setSubmitting] = useState(false);
+        const handleReg = async e => {
+            e.preventDefault();
+            const phoneRegex = /^09\d{8}$/;
+            if (!phoneRegex.test(regForm.phone)) {
+                Swal.fire({ icon: 'error', title: '格式錯誤', text: '請輸入有效的 10 位手機號碼，必須以 09 開頭。', confirmButtonColor: '#D32F2F' });
+                return;
+            }
+            setSubmitting(true);
+            const res = await runGAS('register', { ...regForm, lineUserId: profile?.userId });
+            if (res.status === 'success') { 
+                onMemberUpdate(res.member); 
+                Swal.fire({ icon: 'success', title: '歡迎加入!', text: '已獲得新會員點數 100 點', confirmButtonColor: '#B91C1C' });
+            } else { 
+                Swal.fire({ icon: 'error', title: '註冊失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+            }
+            setSubmitting(false);
+        };
+        return React.createElement("form", { onSubmit: handleReg, className: "p-6 space-y-6" },
+             React.createElement("div", { className: "text-center mb-6" },
+                React.createElement("h2", { className: "text-2xl font-bold text-[#B91C1C]" }, "加入會員"),
+                React.createElement("p", { className: "text-gray-500 text-sm mt-1" }, "享受專屬優惠與累點回饋")
+             ),
+             [
+              { label: "您的姓名", type: "text", val: regForm.name, key: "name", required: true },
+              { label: "手機號碼", type: "tel", val: regForm.phone, key: "phone", required: true },
+              { label: "電子信箱", type: "email", val: regForm.email, key: "email", required: false },
+             ].map((field, idx) => 
+              React.createElement("div", { key: idx, className: "bg-white p-3 rounded-2xl border-2 border-[#B91C1C]/20 focus-within:border-[#B91C1C] focus-within:bg-red-50 transition-all shadow-sm" },
+                  React.createElement("span", { className: "text-xs font-bold text-[#B91C1C] block mb-1 uppercase tracking-wide" }, field.label),
+                  React.createElement("input", { 
+                      type: field.type, 
+                      className: "w-full bg-transparent outline-none text-gray-800 font-medium placeholder-gray-400", 
+                      required: field.required, 
+                      value: field.val, 
+                      onChange: e => setRegForm({ ...regForm, [field.key]: e.target.value }) 
+                  })
+              )
+             ),
+             React.createElement("div", { className: "bg-white p-3 rounded-2xl border-2 border-[#B91C1C]/20 focus-within:border-[#B91C1C] shadow-sm" },
+                React.createElement("span", { className: "text-xs font-bold text-[#B91C1C] block mb-1 uppercase tracking-wide" }, "性別"),
+                React.createElement("select", { className: "w-full bg-transparent outline-none text-gray-800 font-medium", value: regForm.gender, onChange: e => setRegForm({ ...regForm, gender: e.target.value }) },
+                    React.createElement("option", { value: "男" }, "男"),
+                    React.createElement("option", { value: "女" }, "女"),
+                    React.createElement("option", { value: "其他" }, "其他")
+                )
+             ),
+             React.createElement("div", { className: "bg-red-50 p-4 rounded-2xl border-2 border-dashed border-red-300" },
+                React.createElement("span", { className: "label-text text-red-700 flex items-center gap-1" }, React.createElement(Icon, {name:"gift", className:"w-4 h-4"}), "🎂 生日驚喜"),
+                React.createElement("input", { type: "date", className: "w-full bg-white mt-2 p-2 rounded-lg border border-red-200 outline-none", required: true, value: regForm.birthday, onChange: e => setRegForm({ ...regForm, birthday: e.target.value }) }),
+                React.createElement("p", { className: "text-[10px] text-red-600 mt-2 font-bold" }, "* 生日當月贈送專屬生日餐券乙張")
+             ),
+             React.createElement("button", { type: "submit", disabled: submitting, className: "w-full bg-[#B91C1C] text-white py-4 rounded-xl font-bold shadow-lg shadow-red-200 disabled:bg-gray-400 transition-all active:scale-95" }, submitting ? "處理中..." : "確認加入")
+        );
+      }
+
+      return React.createElement("div", { className: "p-6 pb-24" },
+        React.createElement("div", { className: "bg-gradient-to-br from-[#B91C1C] to-black p-6 rounded-2xl text-white shadow-xl relative overflow-hidden" },
+            React.createElement("div", { className: "absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl" }),
+            React.createElement("div", { className: "text-xl font-bold mb-8 relative z-10" }, RESTAURANT_NAME),
+            React.createElement("div", { className: "flex justify-between items-end relative z-10" },
+                React.createElement("div", null, React.createElement("p", { className: "text-sm opacity-80" }, member.name), React.createElement("p", { className: "tracking-widest font-mono mt-1" }, member.phone)),
+                React.createElement("div", { className: "text-right" }, React.createElement("p", { className: "text-[10px] opacity-60 uppercase" }, "Points"), React.createElement("p", { className: "text-3xl font-bold" }, member.points))
+            )
+        ),
+        React.createElement("div", { className: "mt-4 flex gap-2" },
+           React.createElement("button", { onClick: () => Swal.fire('邀請連結已複製', '快去分享給好友吧！', 'success'), className: "flex-1 bg-white py-2 rounded-lg shadow-sm text-xs font-bold text-[#B91C1C] border border-[#B91C1C] flex items-center justify-center gap-1" }, React.createElement(Icon, {name:"share", className:"w-4 h-4"}), "邀請好友"),
+           React.createElement("button", { onClick: () => Swal.fire('功能開發中', '請出示條碼給店員掃描', 'info'), className: "flex-1 bg-white py-2 rounded-lg shadow-sm text-xs font-bold text-gray-600 border border-gray-300 flex items-center justify-center gap-1" }, React.createElement(Icon, {name:"qr", className:"w-4 h-4"}), "綁定載具")
+        ),
+        React.createElement("div", { className: "mt-6 grid grid-cols-2 gap-4" },
+            [
+                { id: 'MY_BOOKINGS', name: '我的訂位', icon: 'calendar' },
+                { id: 'POINT_HISTORY', name: '點數紀錄', icon: 'history' },
+                { id: 'COUPONS', name: '我的優惠券', icon: 'ticket' },
+                { id: 'STAMP_CARD', name: '集點卡', icon: 'stamp' }
+            ].map(btn => React.createElement("button", { key: btn.id, onClick: () => setView(btn.id), className: "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-2 active:scale-95 transition-all hover:shadow-md" },
+                React.createElement("div", { className: "w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-[#B91C1C]" },
+                   React.createElement(Icon, { name: btn.icon, className: "w-6 h-6" })
+                ),
+                React.createElement("span", { className: "font-bold text-sm text-gray-700" }, btn.name)
+            ))
+        ),
+        React.createElement("div", { className: "mt-6 bg-white rounded-xl p-4 border border-gray-100 space-y-3 shadow-sm" },
+            isEditing ?
+            React.createElement(React.Fragment, null, 
+                React.createElement("div", null, React.createElement("span", { className: "label-text" }, "姓名"), React.createElement("input", { className: "input-field", value: form.name, onChange: e => setForm({ ...form, name: e.target.value }) })),
+                React.createElement("div", null, React.createElement("span", { className: "label-text" }, "電話"), React.createElement("input", { className: "input-field", value: form.phone, onChange: e => setForm({ ...form, phone: e.target.value }) })),
+                React.createElement("div", null, React.createElement("span", { className: "label-text" }, "生日"), React.createElement("input", { type: "date", className: "input-field", value: form.birthday, onChange: e => setForm({ ...form, birthday: e.target.value }) })),
+                React.createElement("div", { className: "flex gap-2 pt-2"},
+                    React.createElement("button", { onClick: handleUpdate, className: "w-full bg-green-600 text-white py-2 rounded-lg font-bold" }, "儲存"),
+                    React.createElement("button", { onClick: () => { setIsEditing(false); setForm(member); }, className: "w-full bg-gray-200 py-2 rounded-lg" }, "取消"),
+                )
+            ) :
+            React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "flex items-center justify-between" },
+                   React.createElement("span", { className: "text-sm font-bold text-gray-500" }, "會員資料管理"),
+                   React.createElement("div", { className: "flex gap-2" },
+                      React.createElement("button", { onClick: () => setIsEditing(true), className: "flex items-center gap-1 text-xs bg-gray-100 px-3 py-1.5 rounded-full text-gray-600 hover:bg-gray-200" }, React.createElement(Icon, {name:"edit", className:"w-3 h-3"}), "修改"),
+                      React.createElement("button", { onClick: handleDelete, className: "flex items-center gap-1 text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-full hover:bg-red-100" }, React.createElement(Icon, {name:"trash", className:"w-3 h-3"}), "刪除")
+                   )
+                )
+            )
+        ),
+        /* Feedback Section Moved Here */
+        React.createElement("div", { className: "mt-6" },
+            !showFeedback ? 
+                React.createElement("button", { onClick: () => setShowFeedback(true), className: "w-full bg-yellow-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-yellow-200" }, React.createElement(Icon, {name:"star", className:"w-5 h-5"}), "填寫用餐回饋 (完食後)")
+                :
+                React.createElement("div", { className: "p-4 bg-white rounded-xl shadow-md border animate-fade-in" },
+                    React.createElement("h3", { className: "font-bold text-gray-700 mb-2" }, "您的寶貴意見"),
+                    React.createElement("div", { className: "flex justify-center my-4" }, 
+                        [1, 2, 3, 4, 5].map(star => React.createElement("button", { key: star, onClick: () => setRating(star) }, React.createElement(Icon, { name: "star", className: `w-8 h-8 ${rating >= star ? 'text-yellow-400 fill-current' : 'text-gray-300'}` })))
+                    ),
+                    React.createElement("textarea", { value: comment, onChange: e => setComment(e.target.value), className: "input-field", placeholder: "請分享您的用餐體驗...", rows: 3 }),
+                    React.createElement("div", { className: "flex gap-2 mt-2" },
+                        React.createElement("button", { onClick: handleSubmitFeedback, disabled: submittingFeedback, className: "w-full bg-[#B91C1C] text-white py-2 rounded-lg disabled:bg-gray-400" }, submittingFeedback ? "傳送中..." : "送出"),
+                        React.createElement("button", { onClick: () => setShowFeedback(false), className: "w-full bg-gray-200 py-2 rounded-lg" }, "取消")
+                    )
+                )
+        )
+      );
     };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));

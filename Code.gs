@@ -16,10 +16,10 @@ function doPost(e) {
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
           chefRecommendations: getSheetDataAsJson("主廚推薦", ["產品名稱", "產品價格", "產品說明", "圖片網址"]),
-          // 新增讀取本店餐點，支援更詳細的欄位
           restaurantMenu: getSheetDataAsJson("本店餐點", ["類別", "子類別", "產品名稱", "產品價格", "圖片網址", "說明", "標籤"]), 
           slotSettings: getSlotSettings(), 
-          bookingsSummary: getBookingsSummary()
+          bookingsSummary: getBookingsSummary(),
+          seatInventory: getSheetDataAsJson("訂位資訊", ["日期", "時段", "可訂位人數", "已訂位人數", "剩餘空位"])
         };
         break;
       case 'register': result = registerMember(params); break;
@@ -68,7 +68,12 @@ function getSheetDataAsJson(sheetName, headers) {
         var obj = {};
         for (var j = 0; j < headerRow.length; j++) {
             if (rowData[j] instanceof Date) {
-                obj[headerRow[j]] = rowData[j].toISOString();
+                // Adjust for timezone offset if necessary, keeping simple for now
+                // Using a format that preserves the date string correctly for frontend parsing
+                var yyyy = rowData[j].getFullYear();
+                var mm = String(rowData[j].getMonth() + 1).padStart(2, '0');
+                var dd = String(rowData[j].getDate()).padStart(2, '0');
+                obj[headerRow[j]] = yyyy + '-' + mm + '-' + dd;
             } else {
                 obj[headerRow[j]] = rowData[j];
             }
@@ -139,7 +144,7 @@ function getBookingsSummary() {
         today.setHours(0,0,0,0);
         
         if (d >= today) {
-            var dateStr = d.toISOString().split('T')[0];
+            var dateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
             var timeStr = time;
             if (time instanceof Date) {
                  timeStr = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
@@ -167,7 +172,7 @@ function findBooking(params) {
         rowPhone = rowPhone.replace(/^'/, '');
         
         if (rowDate >= today && rowName == params.name && rowPhone == params.phone) {
-            var dateStr = rowDate.toISOString().split('T')[0];
+            var dateStr = rowDate.getFullYear() + '-' + String(rowDate.getMonth()+1).padStart(2,'0') + '-' + String(rowDate.getDate()).padStart(2,'0');
             var timeStr = data[i][4]; 
             if (timeStr instanceof Date) {
                timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
@@ -225,6 +230,55 @@ function generateBookingCode() {
   return code;
 }
 
+// Manage Inventory in "訂位資訊" sheet
+function updateSeatInventory(date, time, deltaPeople) {
+    var sheet = getOrCreateSheet("訂位資訊", ["日期", "時段", "可訂位人數", "已訂位人數", "剩餘空位"]);
+    var data = sheet.getDataRange().getValues();
+    var rowIndex = -1;
+    var maxSeats = 30; // Default max capacity
+    var currentBooked = 0;
+
+    // Standardize date string for comparison
+    var targetDate = new Date(date);
+    var targetDateStr = targetDate.getFullYear() + '-' + String(targetDate.getMonth()+1).padStart(2,'0') + '-' + String(targetDate.getDate()).padStart(2,'0');
+
+    // Find existing row
+    for (var i = 1; i < data.length; i++) {
+        var rowDate = new Date(data[i][0]);
+        var rowDateStr = rowDate.getFullYear() + '-' + String(rowDate.getMonth()+1).padStart(2,'0') + '-' + String(rowDate.getDate()).padStart(2,'0');
+        var rowTime = data[i][1];
+        // Standardize time string
+        if (rowTime instanceof Date) {
+            rowTime = rowTime.getHours() + ':' + (rowTime.getMinutes()<10?'0':'') + rowTime.getMinutes();
+        } else {
+            rowTime = String(rowTime).substring(0, 5);
+        }
+
+        if (rowDateStr === targetDateStr && rowTime === time) {
+            rowIndex = i + 1;
+            maxSeats = Number(data[i][2]);
+            currentBooked = Number(data[i][3]);
+            break;
+        }
+    }
+
+    if (rowIndex !== -1) {
+        // Update existing row
+        var newBooked = currentBooked + deltaPeople;
+        // Ensure booked doesn't go below 0 (data correction)
+        if (newBooked < 0) newBooked = 0;
+        var remaining = maxSeats - newBooked;
+        sheet.getRange(rowIndex, 4).setValue(newBooked);
+        sheet.getRange(rowIndex, 5).setValue(remaining);
+    } else {
+        // Create new row
+        // If canceling a booking for a non-existent row, technically shouldn't happen, but we handle it.
+        var newBooked = deltaPeople > 0 ? deltaPeople : 0;
+        var remaining = maxSeats - newBooked;
+        sheet.appendRow([targetDateStr, time, maxSeats, newBooked, remaining]);
+    }
+}
+
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
   
@@ -245,6 +299,11 @@ function saveBooking(data) {
       data.notes, 
       '' 
   ]);
+
+  // Update Inventory
+  var totalPeople = Number(data.adults) + Number(data.children);
+  updateSeatInventory(data.date, data.time, totalPeople);
+
   return { status: 'success', bookingId: sheet.getLastRow(), bookingCode: bookingCode };
 }
 
@@ -252,6 +311,17 @@ function updateBooking(data) {
     var sheet = getOrCreateSheet("訂位紀錄");
     var row = Number(data.bookingId);
     if (row > 1 && row <= sheet.getLastRow()) {
+        // Get old values to calculate difference
+        var oldDate = sheet.getRange(row, 4).getValue();
+        var oldTime = sheet.getRange(row, 5).getValue();
+        if (oldTime instanceof Date) {
+             oldTime = oldTime.getHours() + ':' + (oldTime.getMinutes()<10?'0':'') + oldTime.getMinutes();
+        } else {
+             oldTime = String(oldTime).substring(0, 5);
+        }
+        var oldPeople = Number(sheet.getRange(row, 6).getValue()) + Number(sheet.getRange(row, 7).getValue());
+
+        // Update columns
         sheet.getRange(row, 4).setValue(data.date);       
         sheet.getRange(row, 5).setValue(data.time);       
         sheet.getRange(row, 6).setValue(data.adults);     
@@ -264,6 +334,24 @@ function updateBooking(data) {
         
         var bookingCode = sheet.getRange(row, 1).getValue();
 
+        // Update Inventory Logic
+        var newPeople = Number(data.adults) + Number(data.children);
+        
+        // If date/time changed, revert old slot and add to new slot
+        // Date objects need specific comparison
+        var oldDateObj = new Date(oldDate);
+        var newDateObj = new Date(data.date);
+        var isDateSame = oldDateObj.getFullYear() === newDateObj.getFullYear() && oldDateObj.getMonth() === newDateObj.getMonth() && oldDateObj.getDate() === newDateObj.getDate();
+
+        if (isDateSame && oldTime === data.time) {
+            // Same slot, just update count difference
+            updateSeatInventory(data.date, data.time, newPeople - oldPeople);
+        } else {
+            // Different slot: remove from old, add to new
+            updateSeatInventory(oldDate, oldTime, -oldPeople);
+            updateSeatInventory(data.date, data.time, newPeople);
+        }
+
         return { status: 'success', bookingId: row, bookingCode: bookingCode };
     }
     return { status: 'error', message: '訂位資料找不到' };
@@ -273,7 +361,24 @@ function cancelBooking(data) {
     var sheet = getOrCreateSheet("訂位紀錄");
     var row = Number(data.bookingId);
     if (row > 1 && row <= sheet.getLastRow()) {
+        // Need to read date/time/people before deleting to update inventory
+        // If frontend passes this info, great (optimization). If not, we must read.
+        // The frontend 'cancel' passes basic info but it's safer to read from sheet if we trust row ID.
+        // Assuming data.date/time/adults/children are passed correctly from frontend state for speed.
+        // But for consistency let's read from the row to be safe.
+        var date = sheet.getRange(row, 4).getValue();
+        var time = sheet.getRange(row, 5).getValue();
+         if (time instanceof Date) {
+             time = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
+        } else {
+             time = String(time).substring(0, 5);
+        }
+        var people = Number(sheet.getRange(row, 6).getValue()) + Number(sheet.getRange(row, 7).getValue());
+
         sheet.deleteRow(row);
+
+        updateSeatInventory(date, time, -people);
+
         return { status: 'success' };
     }
     return { status: 'error', message: '訂位資料找不到' };
