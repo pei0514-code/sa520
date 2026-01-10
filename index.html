@@ -21,22 +21,19 @@
       color: #333; 
       margin: 0;
       padding: 0;
-      overflow-x: hidden;
-      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
     }
-    ::-webkit-scrollbar { width: 0px; background: transparent; }
-    
-    .loading-spinner {
-      border: 3px solid rgba(44, 94, 80, 0.1);
-      border-top: 3px solid var(--brand-green);
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    #emergency-msg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: white;
+      z-index: 10000;
+      padding: 40px;
+      text-align: center;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
   </style>
 
@@ -61,18 +58,31 @@
         }
       }
     }
+    
+    // 緊急防卡死機制
+    setTimeout(() => {
+      const root = document.getElementById('root');
+      if (root && root.innerHTML === "") {
+        document.getElementById('emergency-msg').style.display = 'flex';
+      }
+    }, 8000);
   </script>
 <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
 <body>
+  <div id="emergency-msg">
+    <div style="color: #D32F2F; font-size: 40px; margin-bottom: 20px;">⚠️</div>
+    <h2 style="font-weight: bold; margin-bottom: 10px;">系統啟動失敗</h2>
+    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">這可能是因為網路連線不穩或瀏覽器不支援模組載入。</p>
+    <button onclick="window.location.reload()" style="background: #2c5e50; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold;">重新整理</button>
+  </div>
+  
   <div id="root"></div>
 </body>
 </html>
