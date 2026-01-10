@@ -14,9 +14,7 @@ function doPost(e) {
           status: 'success',
           member: getMemberByLineId(lineUserId),
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
-          // 確保欄位名稱對應試算表
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
-          // 新增主廚推薦讀取
           chefRecommendations: getSheetDataAsJson("主廚推薦", ["產品名稱", "產品價格", "產品說明", "圖片網址"]),
           slotSettings: getSlotSettings(), 
           bookingsSummary: getBookingsSummary()
@@ -53,7 +51,6 @@ function doPost(e) {
 // ========================
 function getMemberByLineId(lineUserId) {
   if (!lineUserId) return null;
-  // lineid 全部小寫以防萬一，但寫入時是用 LINE ID
   var data = getSheetDataAsJson("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
   return data.find(row => row['LINE ID'] === lineUserId) || null;
 }
@@ -68,7 +65,6 @@ function getSheetDataAsJson(sheetName, headers) {
         var rowData = values[i];
         var obj = {};
         for (var j = 0; j < headerRow.length; j++) {
-            // 處理日期格式，轉為 ISO 字串方便前端使用
             if (rowData[j] instanceof Date) {
                 obj[headerRow[j]] = rowData[j].toISOString();
             } else {
@@ -98,7 +94,6 @@ function getSlotSettings() {
     var data = sheet.getDataRange().getValues();
     
     if (data.length <= 1) {
-        // Removed 20:00 from default slots
         var defaults = [
             ["11:00", 30, "", "", 180], ["11:30", 30, "", "", 180], ["12:00", 30, "", "", 180], 
             ["12:30", 30, "", "", 180], ["13:00", 30, "", "", 180],
@@ -126,16 +121,17 @@ function getSlotSettings() {
     return settings;
 }
 
+// 調整欄位索引：訂位代號(0), 建立時間(1), LINE ID(2), 預約日期(3), 預約時間(4), 大人(5), 小孩(6), 兒童椅(7), 素食(8), 姓名(9), 電話(10), 備註(11), 預點餐(12)
 function getBookingsSummary() {
-    var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
+    var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
     var data = sheet.getDataRange().getValues();
     var summary = [];
     
     for (var i = 1; i < data.length; i++) {
-        var date = data[i][2];
-        var time = data[i][3];
-        var adults = Number(data[i][4]) || 0;
-        var children = Number(data[i][5]) || 0;
+        var date = data[i][3]; // Index changed
+        var time = data[i][4]; // Index changed
+        var adults = Number(data[i][5]) || 0;
+        var children = Number(data[i][6]) || 0;
         
         var d = new Date(date);
         var today = new Date();
@@ -163,14 +159,17 @@ function findBooking(params) {
     today.setHours(0,0,0,0);
 
     for (var i = 1; i < data.length; i++) {
-        var rowDate = new Date(data[i][2]);
-        var rowName = data[i][10];
-        var rowPhone = String(data[i][11]);
+        // Index changes: Date is 3, Name is 9, Phone is 10
+        var rowDate = new Date(data[i][3]);
+        var rowName = data[i][9];
+        var rowPhone = String(data[i][10]);
         if (!rowPhone.startsWith('0') && rowPhone.length === 9) rowPhone = '0' + rowPhone;
+        // Remove single quote for comparison if exists
+        rowPhone = rowPhone.replace(/^'/, '');
         
         if (rowDate >= today && rowName == params.name && rowPhone == params.phone) {
             var dateStr = rowDate.toISOString().split('T')[0];
-            var timeStr = data[i][3]; 
+            var timeStr = data[i][4]; 
             if (timeStr instanceof Date) {
                timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
             } else {
@@ -179,16 +178,17 @@ function findBooking(params) {
 
             results.push({
                 id: i + 1,
+                bookingCode: data[i][0], // 訂位代號
                 date: dateStr,
                 time: timeStr,
-                adults: data[i][4],
-                children: data[i][5],
-                highChairs: data[i][6],
-                vegetarian: data[i][7] === '是',
+                adults: data[i][5],
+                children: data[i][6],
+                highChairs: data[i][7],
+                vegetarian: data[i][8] === '是',
                 name: rowName,
                 phone: rowPhone,
-                notes: data[i][12],
-                preOrder: data[i][13]
+                notes: data[i][11],
+                preOrder: data[i][12]
             });
         }
     }
@@ -200,47 +200,62 @@ function findBooking(params) {
 // ========================
 function registerMember(data) {
   var sheet = getOrCreateSheet("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
-  // Force phone number to string by prepending '
   sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 100, data.gender, data.email ]);
   addPoints(data.lineUserId, 100, "新會員註冊禮");
   getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
   
-  // 直接回傳建立好的物件，不用再查一次資料庫，確保速度與一致性
   var newMember = {
-    'LINE ID': data.lineUserId,
-    '姓名': data.name,
-    '電話': data.phone,
-    '生日': data.birthday,
-    '點數': 100,
-    '性別': data.gender,
-    'Email': data.email
+    'LINE ID': data.lineUserId, '姓名': data.name, '電話': data.phone, '生日': data.birthday, '點數': 100, '性別': data.gender, 'Email': data.email
   };
   return { status: 'success', member: newMember };
 }
 
 function saveBooking(data) {
-  var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
-  // Force phone number to string
-  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', "", "", data.name, "'" + data.phone, data.notes, '' ]);
-  return { status: 'success', bookingId: sheet.getLastRow() };
+  // New Header: ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]
+  var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
+  
+  // Generate Booking Code: SA + 3-digit row number padding
+  var nextRow = sheet.getLastRow() + 1;
+  var bookingCode = 'SA' + ('000' + nextRow).slice(-3);
+
+  // Removed: Seat Preference, Occasion
+  sheet.appendRow([ 
+      bookingCode, 
+      new Date(), 
+      data.lineUserId, 
+      data.date, 
+      data.time, 
+      data.adults, 
+      data.children, 
+      data.highChairs, 
+      data.vegetarian ? '是' : '否', 
+      data.name, 
+      "'" + data.phone, 
+      data.notes, 
+      '' 
+  ]);
+  return { status: 'success', bookingId: nextRow, bookingCode: bookingCode };
 }
 
 function updateBooking(data) {
     var sheet = getOrCreateSheet("訂位紀錄");
     var row = Number(data.bookingId);
     if (row > 1 && row <= sheet.getLastRow()) {
-        sheet.getRange(row, 3).setValue(data.date);
-        sheet.getRange(row, 4).setValue(data.time);
-        sheet.getRange(row, 5).setValue(data.adults);
-        sheet.getRange(row, 6).setValue(data.children);
-        sheet.getRange(row, 7).setValue(data.highChairs);
-        sheet.getRange(row, 8).setValue(data.vegetarian ? '是' : '否');
-        sheet.getRange(row, 9).setValue(""); // Clear Seating
-        sheet.getRange(row, 10).setValue(""); // Clear Occasion
-        sheet.getRange(row, 11).setValue(data.name);
-        sheet.getRange(row, 12).setValue("'" + data.phone); // Force string
-        sheet.getRange(row, 13).setValue(data.notes);
-        return { status: 'success', bookingId: row };
+        // Update indices based on new columns
+        sheet.getRange(row, 4).setValue(data.date);       // Date
+        sheet.getRange(row, 5).setValue(data.time);       // Time
+        sheet.getRange(row, 6).setValue(data.adults);     // Adults
+        sheet.getRange(row, 7).setValue(data.children);   // Children
+        sheet.getRange(row, 8).setValue(data.highChairs); // High Chairs
+        sheet.getRange(row, 9).setValue(data.vegetarian ? '是' : '否'); // Veg
+        sheet.getRange(row, 10).setValue(data.name);      // Name
+        sheet.getRange(row, 11).setValue("'" + data.phone); // Phone
+        sheet.getRange(row, 12).setValue(data.notes);     // Notes
+        
+        // Retrieve the Booking Code to return it
+        var bookingCode = sheet.getRange(row, 1).getValue();
+
+        return { status: 'success', bookingId: row, bookingCode: bookingCode };
     }
     return { status: 'error', message: '訂位資料找不到' };
 }
@@ -261,16 +276,15 @@ function updateMember(data) {
   for (var i = 1; i < values.length; i++) {
     if (values[i][1] === data.lineUserId) {
       sheet.getRange(i + 1, 3).setValue(data.name);
-      sheet.getRange(i + 1, 4).setValue("'" + data.phone); // Force string
+      sheet.getRange(i + 1, 4).setValue("'" + data.phone);
       sheet.getRange(i + 1, 5).setValue(data.birthday);
       if (values[0].length > 6) sheet.getRange(i + 1, 7).setValue(data.gender);
       if (values[0].length > 7) sheet.getRange(i + 1, 8).setValue(data.email);
-      // 回傳更新後的物件
       return { 
           status: 'success', 
           member: {
             'LINE ID': data.lineUserId, '姓名': data.name, '電話': data.phone, '生日': data.birthday, '性別': data.gender, 'Email': data.email,
-            '點數': Number(values[i][5]) // 保留原有點數
+            '點數': Number(values[i][5])
           }
       };
     }
@@ -293,7 +307,8 @@ function deleteMember(data) {
 function savePreOrder(data) {
   var sheet = getOrCreateSheet("訂位紀錄");
   var orderSummary = data.order.map(item => `${item.n} x${item.qty}`).join('; ');
-  sheet.getRange(data.bookingId, 14).setValue(orderSummary);
+  // PreOrder is now at index 13 (column M)
+  sheet.getRange(data.bookingId, 13).setValue(orderSummary);
   return { status: 'success' };
 }
 

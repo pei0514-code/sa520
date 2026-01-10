@@ -64,7 +64,7 @@
     const Icon = ({ name, className }) => {
       const paths = {
         menu: "M4 6h16M4 12h16M4 18h16",
-        calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+        calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
         map: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z",
         user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
         gift: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7",
@@ -78,7 +78,7 @@
         cart: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
         question: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.79 4 4 0 .742-.215 1.42-.588 2H12v2h3.535a4.004 4.004 0 01-7.07 0H5V9h3.228zM12 4a8 8 0 100 16 8 8 0 000-16z",
         info: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-        ticket: "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z",
+        ticket: "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 110-4V7a2 2 0 00-2-2H5z",
         history: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
         stamp: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
         search: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
@@ -401,21 +401,36 @@
         const today = new Date();
         const [viewMonth, setViewMonth] = useState(today.toISOString().slice(0, 7));
         const [form, setForm] = useState({ 
-            date: '', 
+            date: '', // Default to empty to force selection
             time: '', adults: 2, children: 0, highChairs: 0, 
             name: member?.name || profile?.displayName || '', 
             phone: member?.phone || '', notes: '', vegetarian: false, 
             bookingId: null, preOrder: ''
         });
         
-        // Search Form State
+        // Search Form State with Priority Logic: Member > LocalStorage > Empty
         const [searchForm, setSearchForm] = useState(() => {
+            if (member && member.電話) {
+                // Remove quote if stored with one
+                return { name: member.姓名 || '', phone: member.電話.replace(/'/g, '') };
+            }
             try {
                 const saved = localStorage.getItem('booking_search_info');
                 if (saved) return JSON.parse(saved);
             } catch(e) {}
-            return { name: member?.name || profile?.displayName || '', phone: member?.phone || '' };
+            return { name: member?.name || profile?.displayName || '', phone: '' };
         });
+
+        // Effect to update search form if member data loads later
+        useEffect(() => {
+            if (member && member.電話) {
+                setSearchForm(prev => ({ 
+                    ...prev, 
+                    phone: member.電話.replace(/'/g, ''),
+                    name: member.姓名 || prev.name
+                }));
+            }
+        }, [member]);
 
         const [searchResults, setSearchResults] = useState([]);
         const [submitting, setSubmitting] = useState(false);
@@ -437,12 +452,6 @@
             }
             return dates;
         }, [viewMonth]);
-
-        useEffect(() => {
-            if(mode === 'CREATE' && daysInMonth.length > 0 && (!form.date || !daysInMonth.find(d => d.toISOString().split('T')[0] === form.date))) {
-                setForm(prev => ({ ...prev, date: daysInMonth[0].toISOString().split('T')[0] }));
-            }
-        }, [daysInMonth, mode]);
 
         useEffect(() => {
             localStorage.setItem('booking_search_info', JSON.stringify(searchForm));
@@ -472,6 +481,10 @@
 
         const handleBooking = async e => {
             e.preventDefault();
+            if (!form.date) {
+                Swal.fire({ icon: 'warning', title: '請選擇日期', text: '請點選行事曆上的日期', confirmButtonColor: '#D32F2F' });
+                return;
+            }
             if (!form.time) {
                 Swal.fire({ icon: 'warning', title: '請選擇時間', text: '請點選下方的用餐時段', confirmButtonColor: '#D32F2F' });
                 return;
@@ -487,15 +500,16 @@
             const res = await runGAS(action, { ...form, lineUserId: profile?.userId });
             
             if (res.status === 'success') {
+                const bookingCode = res.bookingCode || '查詢中';
                 const msg = mode === 'EDIT' 
-                    ? `📝 薩諾瓦訂位修改確認：\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n您的訂位已更新！`
-                    : `🔔 薩諾瓦訂位確認：\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n我們會盡快為您確認位置！`;
+                    ? `📝 薩諾瓦訂位修改確認：\n訂位代號：${bookingCode}\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n您的訂位已更新！`
+                    : `🔔 薩諾瓦訂位確認：\n訂位代號：${bookingCode}\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n我們會盡快為您確認位置！`;
                 
                 // Don't send message immediately. Wait for user choice on Pre-order.
 
                 Swal.fire({
                     title: mode === 'EDIT' ? '修改成功！' : '預約成功！',
-                    html: `<b>請問需要${mode === 'EDIT' ? '修改' : ''}預先點餐嗎？</b>`,
+                    html: `訂位代號：<b>${bookingCode}</b><br>已發送訊息至官方帳號。<br><br><b>請問需要${mode === 'EDIT' ? '修改' : ''}預先點餐嗎？</b>`,
                     icon: 'success',
                     showCancelButton: true,
                     confirmButtonText: '前往點餐',
@@ -539,7 +553,7 @@
                     const res = await runGAS('cancelBooking', { bookingId: bookingId });
                     setSubmitting(false);
                     if (res.status === 'success') {
-                        await sendLineMessage(`❌ 薩諾瓦訂位取消：\n日期：${info.date}\n時間：${info.time}\n姓名：${info.name}\n電話：${info.phone}\n您的訂位已取消。`);
+                        await sendLineMessage(`❌ 薩諾瓦訂位取消：\n訂位代號：${info.bookingCode}\n日期：${info.date}\n時間：${info.time}\n姓名：${info.name}\n電話：${info.phone}\n您的訂位已取消。`);
                         Swal.fire('已取消', '您的訂位已成功取消。', 'success');
                         handleSearch(new Event('submit'));
                     } else {
@@ -639,7 +653,10 @@
                 searchResults.length > 0 && React.createElement("div", { className: "space-y-4" },
                     searchResults.map(res => React.createElement("div", { key: res.id, className: "bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-3" },
                         React.createElement("div", null,
-                            React.createElement("p", { className: "font-bold text-lg" }, `${res.date} ${res.time}`),
+                            React.createElement("div", { className: "flex justify-between items-center" },
+                                React.createElement("p", { className: "font-bold text-lg" }, `${res.date} ${res.time}`),
+                                React.createElement("span", { className: "text-xs font-mono bg-gray-100 px-2 py-1 rounded" }, res.bookingCode)
+                            ),
                             React.createElement("p", { className: "text-sm text-gray-600" }, `${res.adults}大 ${res.children}小`),
                             res.preOrder && React.createElement("p", { className: "text-xs text-[#B91C1C] mt-1" }, `已點餐: ${res.preOrder}`)
                         ),
@@ -677,7 +694,7 @@
                     React.createElement("span", { className: "label-text whitespace-nowrap" }, "選擇月份"),
                     React.createElement("input", { type: "month", value: viewMonth, min: new Date().toISOString().slice(0, 7), onChange: e => setViewMonth(e.target.value), className: "input-field py-2" })
                 ),
-                React.createElement("div", { className: "mb-2" }, React.createElement("span", { className: "label-text" }, "選擇日期 (週一公休)")),
+                React.createElement("div", { className: "mb-2" }, React.createElement("span", { className: "label-text" }, "選擇日期 (週一公休)"), !form.date && React.createElement("span", { className: "text-xs text-red-500 font-bold ml-2 animate-pulse" }, "* 請選擇日期")),
                 React.createElement("div", { className: "flex overflow-x-auto gap-3 pb-4 no-scrollbar -mx-2 px-2" },
                     daysInMonth.map(d => {
                         const dateStr = d.toISOString().split('T')[0];
