@@ -64,7 +64,7 @@
     const Icon = ({ name, className }) => {
       const paths = {
         menu: "M4 6h16M4 12h16M4 18h16",
-        calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+        calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
         map: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z",
         user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
         gift: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7",
@@ -378,7 +378,7 @@
             bookingId: null, preOrder: ''
         });
         
-        // Search Form State - Initialize from LocalStorage or props
+        // Search Form State
         const [searchForm, setSearchForm] = useState(() => {
             try {
                 const saved = localStorage.getItem('booking_search_info');
@@ -414,7 +414,6 @@
             }
         }, [daysInMonth, mode]);
 
-        // Save Search Form to LocalStorage
         useEffect(() => {
             localStorage.setItem('booking_search_info', JSON.stringify(searchForm));
         }, [searchForm]);
@@ -462,26 +461,30 @@
                     ? `📝 薩諾瓦訂位修改確認：\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n您的訂位已更新！`
                     : `🔔 薩諾瓦訂位確認：\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n我們會盡快為您確認位置！`;
                 
-                await sendLineMessage(msg);
+                // Don't send message immediately. Wait for user choice on Pre-order.
 
                 Swal.fire({
                     title: mode === 'EDIT' ? '修改成功！' : '預約成功！',
-                    html: `已發送訊息至官方帳號。<br><br><b>請問需要${mode === 'EDIT' ? '修改' : ''}預先點餐嗎？</b>`,
+                    html: `<b>請問需要${mode === 'EDIT' ? '修改' : ''}預先點餐嗎？</b>`,
                     icon: 'success',
                     showCancelButton: true,
                     confirmButtonText: '前往點餐',
                     cancelButtonText: '完成',
                     confirmButtonColor: '#B91C1C',
                     cancelButtonColor: '#6e7881',
-                }).then((result) => {
+                }).then(async (result) => {
                     if (result.isConfirmed) {
+                        // Pass booking info AND message text to Preorder view
                         onBookingSuccess({
                             bookingId: res.bookingId, 
                             adults: form.adults, 
                             children: form.children,
-                            preOrder: form.preOrder 
+                            preOrder: form.preOrder,
+                            bookingMessageText: msg // Pass the text to be sent later
                         });
                     } else {
+                        // User chose NOT to pre-order, send the booking message now.
+                        await sendLineMessage(msg);
                         onBack();
                     }
                 });
@@ -508,7 +511,6 @@
                     if (res.status === 'success') {
                         await sendLineMessage(`❌ 薩諾瓦訂位取消：\n日期：${info.date}\n時間：${info.time}\n姓名：${info.name}\n電話：${info.phone}\n您的訂位已取消。`);
                         Swal.fire('已取消', '您的訂位已成功取消。', 'success');
-                        // Refresh Search
                         handleSearch(new Event('submit'));
                     } else {
                         Swal.fire({ icon: 'error', title: '取消失敗', text: res.message });
@@ -517,7 +519,7 @@
             });
         };
 
-        const handleCancel = async () => { /* Logic inside Edit Form - keep for compatibility if needed, but main cancel is now in list */
+        const handleCancel = async () => { 
              handleQuickCancel(form.bookingId, form);
         };
 
@@ -755,6 +757,7 @@
             setSubmitting(true);
             const res = await runGAS('register', { ...regForm, lineUserId: profile?.userId });
             if (res.status === 'success') { 
+                // Fix: Immediately update parent state to trigger re-render to "Member" view
                 onMemberUpdate(res.member); 
                 Swal.fire({ icon: 'success', title: '歡迎加入!', text: '已獲得新會員點數 100 點', confirmButtonColor: '#B91C1C' });
             } else { 
@@ -945,8 +948,10 @@
         }, [booking]);
 
         const minChargePerPerson = 60;
-        const totalPeople = (parseInt(booking?.adults) || 0) + (parseInt(booking?.children) || 0);
-        const requiredTotal = minChargePerPerson * totalPeople;
+        // Fix: Exclude children from minimum charge calculation
+        const payingPeople = parseInt(booking?.adults) || 0; 
+        const totalPeople = payingPeople + (parseInt(booking?.children) || 0); // Display purposes only
+        const requiredTotal = minChargePerPerson * payingPeople;
 
         const addToCart = (item) => {
             setCart(prev => {
@@ -972,7 +977,7 @@
                  Swal.fire({ 
                      icon: 'warning', 
                      title: '未達低消', 
-                     text: `每人低消 $${minChargePerPerson}。\n目前人數 ${totalPeople} 人，總金額需達 $${requiredTotal}。\n還差 $${requiredTotal - total}。`, 
+                     text: `每人低消 $${minChargePerPerson} (不含兒童)。\n目前計費人數 ${payingPeople} 人，總金額需達 $${requiredTotal}。\n還差 $${requiredTotal - total}。`, 
                      confirmButtonColor: '#D32F2F' 
                  });
                  return;
@@ -981,9 +986,13 @@
             const res = await runGAS('savePreOrder', { bookingId: booking.bookingId, order: cart });
             if(res.status === 'success') {
                 if (window.liff.isInClient()) {
+                    // Combine booking info and order info into one message
+                    const orderText = cart.map(i => `${i.n} x${i.qty}`).join('\n');
+                    const fullMessage = booking.bookingMessageText + `\n\n🍔 預點餐點確認：\n${orderText}\n\n預點金額：$${total}`;
+                    
                     await window.liff.sendMessages([{
                         type: 'text',
-                        text: `🍔 薩諾瓦預點餐確認：\n日期：${booking.date || '未知'}\n金額：$${total}\n內容：${cart.map(i => `${i.n} x${i.qty}`).join(', ')}`
+                        text: fullMessage
                     }]).catch(console.error);
                 }
                 setShowCartModal(false);
@@ -1005,7 +1014,7 @@
             React.createElement("div", { className: "w-[72%] p-4 overflow-y-auto pb-36 bg-white" },
                 React.createElement("div", { className: "bg-red-50 p-3 mb-4 rounded-xl text-xs text-red-700 font-bold border border-red-100 flex items-center gap-2" }, 
                    React.createElement(Icon, {name:"info", className:"w-4 h-4"}),
-                   `低消提醒：每人 $${minChargePerPerson} (共需 $${requiredTotal})`
+                   `低消提醒：每人 $${minChargePerPerson} (不含兒童) (共需 $${requiredTotal})`
                 ),
                 React.createElement("h3", { className: "font-bold text-xl text-gray-800 mb-4" }, activeCategory),
                 React.createElement("div", { className: "space-y-4" },

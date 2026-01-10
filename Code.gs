@@ -191,7 +191,8 @@ function findBooking(params) {
 // ========================
 function registerMember(data) {
   var sheet = getOrCreateSheet("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
-  sheet.appendRow([ new Date(), data.lineUserId, data.name, data.phone, data.birthday, 100, data.gender, data.email ]);
+  // Force phone number to string by prepending '
+  sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 100, data.gender, data.email ]);
   addPoints(data.lineUserId, 100, "新會員註冊禮");
   getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
   return { status: 'success', member: getMemberByLineId(data.lineUserId) };
@@ -199,7 +200,8 @@ function registerMember(data) {
 
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
-  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', "", "", data.name, data.phone, data.notes, '' ]);
+  // Force phone number to string
+  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', "", "", data.name, "'" + data.phone, data.notes, '' ]);
   return { status: 'success', bookingId: sheet.getLastRow() };
 }
 
@@ -216,7 +218,7 @@ function updateBooking(data) {
         sheet.getRange(row, 9).setValue(""); // Clear Seating
         sheet.getRange(row, 10).setValue(""); // Clear Occasion
         sheet.getRange(row, 11).setValue(data.name);
-        sheet.getRange(row, 12).setValue(data.phone);
+        sheet.getRange(row, 12).setValue("'" + data.phone); // Force string
         sheet.getRange(row, 13).setValue(data.notes);
         return { status: 'success', bookingId: row };
     }
@@ -239,7 +241,7 @@ function updateMember(data) {
   for (var i = 1; i < values.length; i++) {
     if (values[i][1] === data.lineUserId) {
       sheet.getRange(i + 1, 3).setValue(data.name);
-      sheet.getRange(i + 1, 4).setValue(data.phone);
+      sheet.getRange(i + 1, 4).setValue("'" + data.phone); // Force string
       sheet.getRange(i + 1, 5).setValue(data.birthday);
       if (values[0].length > 6) sheet.getRange(i + 1, 7).setValue(data.gender);
       if (values[0].length > 7) sheet.getRange(i + 1, 8).setValue(data.email);
