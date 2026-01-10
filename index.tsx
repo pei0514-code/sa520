@@ -441,28 +441,59 @@ const ChatOverlay = ({ onClose }: { onClose: () => void }) => {
 const App = () => {
   const [view, setView] = useState('HOME');
   const [showChat, setShowChat] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loadingState, setLoadingState] = useState<'loading' | 'success' | 'error'>('loading');
   const [profile, setProfile] = useState<any>(null);
   const [data, setData] = useState({ member: null, faqs: [], promotions: [] });
 
   useEffect(() => {
+    let isMounted = true;
+    const loadingTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoadingState(current => current === 'loading' ? 'error' : current);
+      }
+    }, 5000);
+
     const init = async () => {
-       setLoading(true);
-       let p = null;
-       if (window.liff) {
-         try {
-           await window.liff.init({ liffId: LIFF_ID });
-           if (window.liff.isLoggedIn()) p = await window.liff.getProfile();
-         } catch(e) { 
-           console.error('LIFF Error', e); 
-         }
-       }
-       setProfile(p);
-       const initialData = await runGoogleScript('getInitialData', { lineUserId: p?.userId || '' });
-       if(initialData.status === 'success') setData(initialData);
-       setLoading(false);
+      try {
+        let p = null;
+        if (window.liff) {
+          try {
+            await window.liff.init({ liffId: LIFF_ID });
+            if (window.liff.isLoggedIn()) p = await window.liff.getProfile();
+          } catch(e) { 
+            console.error('LIFF Error', e); 
+          }
+        }
+        
+        if (!isMounted) return;
+        setProfile(p);
+        
+        const initialData = await runGoogleScript('getInitialData', { lineUserId: p?.userId || '' });
+        if (!isMounted) return;
+
+        if(initialData.status === 'success') {
+           setData(initialData);
+           setLoadingState('success');
+        } else {
+           console.error('Failed to get initial data:', initialData.message);
+           setLoadingState('error');
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Catastrophic initialization error:', err);
+          setLoadingState('error');
+        }
+      } finally {
+        clearTimeout(loadingTimer);
+      }
     };
+    
     init();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(loadingTimer);
+    };
   }, []);
 
   const handleRegisterSuccess = (newMember: any) => {
@@ -480,7 +511,34 @@ const App = () => {
      }
   };
 
-  if (loading) return (<div className="fixed inset-0 bg-white flex flex-col items-center justify-center"><div className="w-10 h-10 border-4 border-gray-200 border-t-italian-green rounded-full animate-spin mb-4"></div><div className="text-gray-400 font-bold">載入餐廳資訊...</div></div>);
+  if (loadingState === 'loading') {
+    return (
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-italian-green rounded-full animate-spin mb-4"></div>
+        <div className="text-gray-400 font-bold">載入餐廳資訊...</div>
+      </div>
+    );
+  }
+
+  if (loadingState === 'error') {
+    return (
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center text-center p-6 animate-fade-in">
+        <div className="w-16 h-16 text-red-400 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">載入失敗</h2>
+        <p className="text-gray-500 mb-6">網路連線不穩定或系統忙碌中，請稍後再試。</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-italian-green text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-italian-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-italian-green transition-all"
+        >
+          重新整理
+        </button>
+      </div>
+    );
+  }
 
   const renderView = () => {
     switch(view) {
