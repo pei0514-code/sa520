@@ -18,54 +18,187 @@
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; 
       background-color: var(--bg-color); 
-      color: #333; 
       margin: 0;
       padding: 0;
-      overflow: hidden;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
     }
-    #emergency-msg {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: white;
-      z-index: 10000;
-      padding: 40px;
-      text-align: center;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .loading-spinner {
+      border: 3px solid rgba(44, 94, 80, 0.1);
+      border-top: 3px solid var(--brand-green);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
     }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    ::-webkit-scrollbar { width: 0px; background: transparent; }
   </style>
 
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'italian-green': '#2c5e50',
-            'italian-red': '#D32F2F',
-            'italian-white': '#fcfbf9',
-            'italian-dark': '#1a3a32',
-          },
-          animation: {
-            'slide-up': 'slideUp 0.3s ease-out',
-            'fade-in': 'fadeIn 0.3s ease-out',
-          },
-          keyframes: {
-            slideUp: { '0%': { transform: 'translateY(100%)' }, '100%': { transform: 'translateY(0)' } },
-            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
-          }
-        }
+  <script type="module">
+    import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
+    import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+
+    const LIFF_ID = "2008861231-EA0Hpl68";
+    const RESTAURANT_NAME = "薩諾瓦義式廚房";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHOJOzIGqCnW-ttjB0_OeJ6eIz3iqF3dnYSwGeK4L2vRi6dEuWZ-i_DoM5pHjz9u7PlA/exec";
+
+    // --- 通訊工具 ---
+    const runGAS = async (action, params = {}) => {
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action, ...params })
+        });
+        return await response.json();
+      } catch (err) {
+        console.error("GAS Error:", err);
+        return { status: 'error', message: '連線失敗' };
       }
-    }
-    
-    // 緊急防卡死機制
-    setTimeout(() => {
-      const root = document.getElementById('root');
-      if (root && root.innerHTML === "") {
-        document.getElementById('emergency-msg').style.display = 'flex';
+    };
+
+    // --- 圖標組件 ---
+    const Icon = ({ name, className }) => {
+      const paths = {
+        menu: "M4 6h16M4 12h16M4 18h16",
+        calendar: "M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 0V2m-14 2V2",
+        map: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z",
+        user: "M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 11a4 4 0 100-8 4 4 0 000 8z",
+        gift: "M20 12v10H4V12 M2 7h20v5H2z M12 22V7 M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z",
+        chat: "M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7",
+        back: "M15 19l-7-7 7-7",
+        phone: "M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6"
+      };
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d={paths[name] || ""} />
+        </svg>
+      );
+    };
+
+    // --- 主程式 ---
+    const App = () => {
+      const [view, setView] = useState('HOME');
+      const [loading, setLoading] = useState(true);
+      const [data, setData] = useState({ member: null, faqs: [], promotions: [] });
+      const [profile, setProfile] = useState(null);
+
+      useEffect(() => {
+        const init = async () => {
+          // 1. LIFF 初始化 (超時控制)
+          try {
+            if (window.liff) {
+              await window.liff.init({ liffId: LIFF_ID });
+              if (window.liff.isLoggedIn()) {
+                const p = await window.liff.getProfile();
+                setProfile(p);
+              }
+            }
+          } catch (e) { console.warn("LIFF 載入失敗，轉為訪客模式"); }
+
+          // 2. 獲取資料
+          const res = await runGAS('getInitialData', { lineUserId: profile?.userId || '' });
+          if (res.status === 'success') setData(res);
+          setLoading(false);
+        };
+        init();
+      }, [profile?.userId]);
+
+      if (loading) {
+        return (
+          <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 text-center">
+            <div className="loading-spinner mb-6"></div>
+            <h2 className="text-italian-green font-bold text-xl tracking-widest">{RESTAURANT_NAME}</h2>
+            <p className="text-gray-400 text-xs mt-3">正在載入美味資訊...</p>
+          </div>
+        );
       }
-    }, 8000);
+
+      const HomeView = () => (
+        <div className="flex flex-col h-full bg-gray-50">
+          <div className="bg-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm h-14">
+            <h1 className="font-bold text-italian-green text-lg">{RESTAURANT_NAME}</h1>
+            {profile && <img src={profile.pictureUrl} className="w-8 h-8 rounded-full border border-italian-green" />}
+          </div>
+          <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            <div className="relative h-44 rounded-2xl overflow-hidden shadow-lg">
+              <img src="https://i.ibb.co/qLFg7gSk/Gemini-Generated-Image-cmj4yzcmj4yzcmj4.png" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 flex items-end p-5">
+                <div className="text-white"><h3 className="font-bold text-xl">Buongiorno!</h3><p className="text-[10px] opacity-80 uppercase tracking-widest font-bold">金門道地義大利風味</p></div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { id: 'MENU', name: '精選菜單', icon: 'menu', color: 'orange' },
+                { id: 'BOOKING', name: '線上訂位', icon: 'calendar', color: 'green' },
+                { id: 'LOCATION', name: '門市資訊', icon: 'map', color: 'blue' },
+                { id: 'MEMBER', name: '會員中心', icon: 'user', color: 'purple' },
+                { id: 'NEWS', name: '最新優惠', icon: 'gift', color: 'red' },
+                { id: 'FAQ', name: '常見問題', icon: 'chat', color: 'gray' }
+              ].map(btn => (
+                <button key={btn.id} onClick={() => setView(btn.id)} className="h-32 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:bg-gray-100 transition-colors">
+                  <div className={`w-10 h-10 bg-${btn.color}-50 rounded-full flex items-center justify-center text-${btn.color}-500`}><Icon name={btn.icon} className="w-6 h-6" /></div>
+                  <span className="font-bold text-gray-700 text-xs">{btn.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="py-10 text-center"><p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Since 2014</p></div>
+          </div>
+        </div>
+      );
+
+      const SimpleView = ({ title, children }) => (
+        <div className="flex flex-col h-full bg-white animate-fade-in">
+          <div className="bg-italian-green text-white p-4 flex items-center shadow-md h-14">
+            <button onClick={() => setView('HOME')} className="mr-3 p-1"><Icon name="back" className="w-6 h-6" /></button>
+            <h2 className="text-lg font-bold">{title}</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto">{children}</div>
+        </div>
+      );
+
+      switch(view) {
+        case 'MENU': return <SimpleView title="精選菜單"><div className="p-4 space-y-4"><img src="https://i.ibb.co/QFTKgJ1B/2023-03-25.webp" className="w-full rounded shadow" /><img src="https://i.ibb.co/hJ6cfgjM/2025-12-28.webp" className="w-full rounded shadow" /></div></SimpleView>;
+        case 'LOCATION': return <SimpleView title="門市資訊"><div className="p-6 space-y-6"><div className="w-full h-48 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">MAP</div><div className="space-y-4"><div className="flex gap-4"><Icon name="map" className="w-6 h-6 text-italian-green" /><div><h4 className="font-bold">地址</h4><p className="text-gray-600">金門縣金湖鎮太湖路二段3巷6號</p></div></div><div className="flex gap-4"><Icon name="calendar" className="w-6 h-6 text-italian-green" /><div><h4 className="font-bold">營業時間</h4><p className="text-gray-600">週二至週日 11:00-14:00/17:00-20:30</p></div></div></div><a href="tel:082332530" className="w-full bg-italian-dark text-white py-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg"><Icon name="phone" className="w-5 h-5" /> 撥打電話</a></div></SimpleView>;
+        case 'NEWS': return <SimpleView title="最新優惠"><div className="p-4 space-y-4">{data.promotions.map((p, i) => <div key={i} className="bg-white rounded-xl shadow-md border overflow-hidden"><img src={p.image} className="w-full h-40 object-cover" /><div className="p-4"><h3 className="font-bold">{p.title}</h3><p className="text-sm text-gray-500">{p.desc}</p></div></div>)}</div></SimpleView>;
+        case 'FAQ': return <SimpleView title="常見問題"><div className="p-4 space-y-3">{data.faqs.map((f, i) => <details key={i} className="bg-gray-50 rounded-xl border p-4 group"><summary className="font-bold cursor-pointer list-none flex justify-between items-center">{f.q}<Icon name="back" className="w-4 h-4 -rotate-90 group-open:rotate-90" /></summary><p className="text-sm text-gray-600 mt-2 pt-2 border-t">{f.a}</p></details>)}</div></SimpleView>;
+        case 'BOOKING': return <SimpleView title="線上訂位"><BookingForm profile={profile} onBack={() => setView('HOME')} /></SimpleView>;
+        case 'MEMBER': return <SimpleView title="會員中心"><MemberCard member={data.member} profile={profile} onUpdate={(m) => setData({...data, member: m})} /></SimpleView>;
+        default: return <HomeView />;
+      }
+    };
+
+    const MemberCard = ({ member, profile, onUpdate }) => {
+      const [form, setForm] = useState({ name: profile?.displayName || '', phone: '' });
+      const handleReg = async (e) => {
+        e.preventDefault();
+        const res = await runGAS('register', { ...form, lineUserId: profile?.userId });
+        if (res.status === 'success') { onUpdate(res.member); Swal.fire('註冊成功!', '', 'success'); }
+        else Swal.fire(res.message, '', 'error');
+      };
+      if (member) return <div className="p-6"><div className="bg-gradient-to-br from-italian-green to-black p-6 rounded-2xl text-white shadow-xl relative overflow-hidden"><div className="text-xl font-bold mb-8">{RESTAURANT_NAME}</div><div className="flex justify-between items-end"><div><p className="text-sm opacity-80">{member.name}</p><p className="tracking-widest">{member.phone}</p></div><div className="text-right"><p className="text-[10px] opacity-60">POINTS</p><p className="text-2xl font-bold">{member.points}</p></div></div></div></div>;
+      return <form onSubmit={handleReg} className="p-6 space-y-4"><input placeholder="姓名" className="w-full p-3 border rounded-xl" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><input placeholder="手機號碼" className="w-full p-3 border rounded-xl" required value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} /><button className="w-full bg-italian-green text-white py-4 rounded-xl font-bold shadow-md">立即加入</button></form>;
+    };
+
+    const BookingForm = ({ profile, onBack }) => {
+      const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], time: '12:00', adults: 2, name: profile?.displayName || '', phone: '' });
+      const handleBooking = async (e) => {
+        e.preventDefault();
+        const res = await runGAS('booking', { ...form, lineUserId: profile?.userId });
+        if (res.status === 'success') { await Swal.fire('預約成功!', '我們會盡快為您安排', 'success'); onBack(); }
+        else Swal.fire(res.message, '', 'error');
+      };
+      return <form onSubmit={handleBooking} className="p-6 space-y-4"><input type="date" className="w-full p-3 border rounded-xl" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} /><input type="time" className="w-full p-3 border rounded-xl" value={form.time} onChange={e=>setForm({...form, time:e.target.value})} /><input type="number" placeholder="大人" className="w-full p-3 border rounded-xl" value={form.adults} onChange={e=>setForm({...form, adults:e.target.value})} /><input placeholder="聯絡大名" className="w-full p-3 border rounded-xl" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><input placeholder="電話" className="w-full p-3 border rounded-xl" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} /><button className="w-full bg-italian-red text-white py-4 rounded-xl font-bold shadow-lg">確認訂位</button></form>;
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 <script type="importmap">
 {
@@ -76,13 +209,6 @@
 </script>
 </head>
 <body>
-  <div id="emergency-msg">
-    <div style="color: #D32F2F; font-size: 40px; margin-bottom: 20px;">⚠️</div>
-    <h2 style="font-weight: bold; margin-bottom: 10px;">系統啟動失敗</h2>
-    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">這可能是因為網路連線不穩或瀏覽器不支援模組載入。</p>
-    <button onclick="window.location.reload()" style="background: #2c5e50; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold;">重新整理</button>
-  </div>
-  
   <div id="root"></div>
 </body>
 </html>
