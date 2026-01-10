@@ -21,25 +21,32 @@
       color: #333; 
       margin: 0;
       padding: 0;
-      -webkit-tap-highlight-color: transparent;
+      overflow-x: hidden;
     }
-    ::-webkit-scrollbar { width: 0px; background: transparent; }
-    .swal2-popup { font-family: inherit !important; border-radius: 1rem !important; }
-    .swal2-confirm { background-color: #2c5e50 !important; }
-    .swal2-styled.swal2-cancel { background-color: #718096 !important; }
-    
-    .loading-spinner {
+    #initial-loader {
+      position: fixed;
+      inset: 0;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
       border: 3px solid rgba(44, 94, 80, 0.1);
       border-top: 3px solid var(--brand-green);
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
       animation: spin 1s linear infinite;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    ::-webkit-scrollbar { width: 0px; background: transparent; }
   </style>
 
   <script>
@@ -75,6 +82,12 @@
 </script>
 </head>
 <body>
+  <!-- 初始加載動畫，當 React 掛載後會被隱藏或移除 -->
+  <div id="initial-loader">
+    <div class="spinner"></div>
+    <div style="margin-top: 20px; color: #2c5e50; font-weight: bold; letter-spacing: 2px;">薩諾瓦義式廚房</div>
+    <div style="margin-top: 8px; color: #999; font-size: 12px;">正在載入美味資訊...</div>
+  </div>
   <div id="root"></div>
 </body>
 </html>
