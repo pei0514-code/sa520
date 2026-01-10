@@ -6,7 +6,6 @@
   <title>薩諾瓦義式廚房</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React 和 ReactDOM 將由平台透過 index.tsx 自動處理 -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -20,11 +19,27 @@
       font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; 
       background-color: var(--bg-color); 
       color: #333; 
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
     }
     ::-webkit-scrollbar { width: 0px; background: transparent; }
     .swal2-popup { font-family: inherit !important; border-radius: 1rem !important; }
     .swal2-confirm { background-color: #2c5e50 !important; }
     .swal2-styled.swal2-cancel { background-color: #718096 !important; }
+    
+    .loading-spinner {
+      border: 3px solid rgba(44, 94, 80, 0.1);
+      border-top: 3px solid var(--brand-green);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 
   <script>
@@ -61,6 +76,5 @@
 </head>
 <body>
   <div id="root"></div>
-  <!-- 應用程式現在由 index.tsx 檔案載入與執行 -->
 </body>
 </html>
