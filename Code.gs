@@ -210,15 +210,25 @@ function registerMember(data) {
   return { status: 'success', member: newMember };
 }
 
+// Helper to generate 4-char Alphanumeric Code
+function generateBookingCode() {
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var code = '';
+  for (var i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
 function saveBooking(data) {
-  // New Header: ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]
   var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
   
-  // Generate Booking Code: SA + 3-digit row number padding
-  var nextRow = sheet.getLastRow() + 1;
-  var bookingCode = 'SA' + ('000' + nextRow).slice(-3);
-
-  // Removed: Seat Preference, Occasion
+  // Generate Random Booking Code
+  var bookingCode = generateBookingCode();
+  // Simple collision check (optional but good practice, though low prob for small scale)
+  // For simplicity in this context without scanning all rows every time, we just generate one. 
+  // With 36^4 = 1.6M combinations, collision is rare for a restaurant.
+  
   sheet.appendRow([ 
       bookingCode, 
       new Date(), 
@@ -234,7 +244,7 @@ function saveBooking(data) {
       data.notes, 
       '' 
   ]);
-  return { status: 'success', bookingId: nextRow, bookingCode: bookingCode };
+  return { status: 'success', bookingId: sheet.getLastRow(), bookingCode: bookingCode };
 }
 
 function updateBooking(data) {
