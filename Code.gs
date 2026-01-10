@@ -16,6 +16,8 @@ function doPost(e) {
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
           chefRecommendations: getSheetDataAsJson("主廚推薦", ["產品名稱", "產品價格", "產品說明", "圖片網址"]),
+          // 新增讀取本店餐點，支援更詳細的欄位
+          restaurantMenu: getSheetDataAsJson("本店餐點", ["類別", "子類別", "產品名稱", "產品價格", "圖片網址", "說明", "標籤"]), 
           slotSettings: getSlotSettings(), 
           bookingsSummary: getBookingsSummary()
         };
@@ -121,15 +123,14 @@ function getSlotSettings() {
     return settings;
 }
 
-// 調整欄位索引：訂位代號(0), 建立時間(1), LINE ID(2), 預約日期(3), 預約時間(4), 大人(5), 小孩(6), 兒童椅(7), 素食(8), 姓名(9), 電話(10), 備註(11), 預點餐(12)
 function getBookingsSummary() {
     var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
     var data = sheet.getDataRange().getValues();
     var summary = [];
     
     for (var i = 1; i < data.length; i++) {
-        var date = data[i][3]; // Index changed
-        var time = data[i][4]; // Index changed
+        var date = data[i][3]; 
+        var time = data[i][4]; 
         var adults = Number(data[i][5]) || 0;
         var children = Number(data[i][6]) || 0;
         
@@ -159,12 +160,10 @@ function findBooking(params) {
     today.setHours(0,0,0,0);
 
     for (var i = 1; i < data.length; i++) {
-        // Index changes: Date is 3, Name is 9, Phone is 10
         var rowDate = new Date(data[i][3]);
         var rowName = data[i][9];
         var rowPhone = String(data[i][10]);
         if (!rowPhone.startsWith('0') && rowPhone.length === 9) rowPhone = '0' + rowPhone;
-        // Remove single quote for comparison if exists
         rowPhone = rowPhone.replace(/^'/, '');
         
         if (rowDate >= today && rowName == params.name && rowPhone == params.phone) {
@@ -178,7 +177,7 @@ function findBooking(params) {
 
             results.push({
                 id: i + 1,
-                bookingCode: data[i][0], // 訂位代號
+                bookingCode: data[i][0],
                 date: dateStr,
                 time: timeStr,
                 adults: data[i][5],
@@ -210,12 +209,18 @@ function registerMember(data) {
   return { status: 'success', member: newMember };
 }
 
-// Helper to generate 4-char Alphanumeric Code
+// Helper to generate 2 Letters + 4 Numbers (e.g. AB1234)
 function generateBookingCode() {
-  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var nums = '0123456789';
   var code = '';
-  for (var i = 0; i < 4; i++) {
+  // 2 Random Letters
+  for (var i = 0; i < 2; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  // 4 Random Numbers
+  for (var i = 0; i < 4; i++) {
+    code += nums.charAt(Math.floor(Math.random() * nums.length));
   }
   return code;
 }
@@ -223,11 +228,7 @@ function generateBookingCode() {
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
   
-  // Generate Random Booking Code
   var bookingCode = generateBookingCode();
-  // Simple collision check (optional but good practice, though low prob for small scale)
-  // For simplicity in this context without scanning all rows every time, we just generate one. 
-  // With 36^4 = 1.6M combinations, collision is rare for a restaurant.
   
   sheet.appendRow([ 
       bookingCode, 
@@ -251,18 +252,16 @@ function updateBooking(data) {
     var sheet = getOrCreateSheet("訂位紀錄");
     var row = Number(data.bookingId);
     if (row > 1 && row <= sheet.getLastRow()) {
-        // Update indices based on new columns
-        sheet.getRange(row, 4).setValue(data.date);       // Date
-        sheet.getRange(row, 5).setValue(data.time);       // Time
-        sheet.getRange(row, 6).setValue(data.adults);     // Adults
-        sheet.getRange(row, 7).setValue(data.children);   // Children
-        sheet.getRange(row, 8).setValue(data.highChairs); // High Chairs
-        sheet.getRange(row, 9).setValue(data.vegetarian ? '是' : '否'); // Veg
-        sheet.getRange(row, 10).setValue(data.name);      // Name
-        sheet.getRange(row, 11).setValue("'" + data.phone); // Phone
-        sheet.getRange(row, 12).setValue(data.notes);     // Notes
+        sheet.getRange(row, 4).setValue(data.date);       
+        sheet.getRange(row, 5).setValue(data.time);       
+        sheet.getRange(row, 6).setValue(data.adults);     
+        sheet.getRange(row, 7).setValue(data.children);   
+        sheet.getRange(row, 8).setValue(data.highChairs); 
+        sheet.getRange(row, 9).setValue(data.vegetarian ? '是' : '否'); 
+        sheet.getRange(row, 10).setValue(data.name);      
+        sheet.getRange(row, 11).setValue("'" + data.phone); 
+        sheet.getRange(row, 12).setValue(data.notes);     
         
-        // Retrieve the Booking Code to return it
         var bookingCode = sheet.getRange(row, 1).getValue();
 
         return { status: 'success', bookingId: row, bookingCode: bookingCode };
@@ -316,8 +315,17 @@ function deleteMember(data) {
 
 function savePreOrder(data) {
   var sheet = getOrCreateSheet("訂位紀錄");
-  var orderSummary = data.order.map(item => `${item.n} x${item.qty}`).join('; ');
-  // PreOrder is now at index 13 (column M)
+  // 將點餐內容字串化儲存
+  var orderSummary = data.order.map(item => {
+      let desc = `${item.n}`;
+      if(item.noodle) desc += `(${item.noodle})`;
+      if(item.spice) desc += `[${item.spice}]`;
+      if(item.combo) desc += `+${item.combo}`;
+      if(item.drink) desc += `/${item.drink}`;
+      desc += ` x${item.qty}`;
+      return desc;
+  }).join('; ');
+  
   sheet.getRange(data.bookingId, 13).setValue(orderSummary);
   return { status: 'success' };
 }
