@@ -70,7 +70,7 @@ function registerMember(data) {
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "姓名", "電話", "備註", "LINE ID"]);
   var dateStr = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-  sheet.appendRow([dateStr, data.date, data.time, data.adults, 0, 0, data.name, data.phone, '', data.lineUserId || '']);
+  sheet.appendRow([dateStr, data.date, data.time, data.adults, data.children || 0, 0, data.name, data.phone, '', data.lineUserId || '']);
   return { status: 'success' };
 }
 

@@ -48,7 +48,6 @@
     const RESTAURANT_NAME = "薩諾瓦義式廚房";
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHOJOzIGqCnW-ttjB0_OeJ6eIz3iqF3dnYSwGeK4L2vRi6dEuWZ-i_DoM5pHjz9u7PlA/exec";
 
-    // --- 通訊工具 ---
     const runGAS = async (action, params = {}) => {
       try {
         const response = await fetch(GOOGLE_SCRIPT_URL, {
@@ -63,7 +62,6 @@
       }
     };
 
-    // --- 圖標組件 ---
     const Icon = ({ name, className }) => {
       const paths = {
         menu: "M4 6h16M4 12h16M4 18h16",
@@ -73,16 +71,14 @@
         gift: "M20 12v10H4V12 M2 7h20v5H2z M12 22V7 M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z",
         chat: "M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7",
         back: "M15 19l-7-7 7-7",
-        phone: "M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6"
+        phone: "M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6",
+        chevronLeft: "M15 19l-7-7 7-7"
       };
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d={paths[name] || ""} />
-        </svg>
+      return React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: paths[name] || "" })
       );
     };
 
-    // --- 主程式 ---
     const App = () => {
       const [view, setView] = useState('HOME');
       const [loading, setLoading] = useState(true);
@@ -91,122 +87,116 @@
 
       useEffect(() => {
         const init = async () => {
-          // 1. LIFF 初始化 (超時控制)
+          let currentUserId = '';
+          let userProfile = null;
           try {
             if (window.liff) {
-              await window.liff.init({ liffId: LIFF_ID });
+              const liffPromise = window.liff.init({ liffId: LIFF_ID });
+              const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 5000));
+              await Promise.race([liffPromise, timeoutPromise]);
               if (window.liff.isLoggedIn()) {
                 const p = await window.liff.getProfile();
-                setProfile(p);
+                userProfile = p;
+                currentUserId = p.userId;
               }
             }
-          } catch (e) { console.warn("LIFF 載入失敗，轉為訪客模式"); }
+          } catch (e) { console.warn("LIFF failed or timed out. Continuing as guest.", e); }
+          
+          setProfile(userProfile);
 
-          // 2. 獲取資料
-          const res = await runGAS('getInitialData', { lineUserId: profile?.userId || '' });
-          if (res.status === 'success') setData(res);
-          setLoading(false);
+          try {
+            const res = await runGAS('getInitialData', { lineUserId: currentUserId });
+            if (res.status === 'success') setData(res);
+            else Swal.fire('資料載入失敗', res.message, 'error');
+          } catch (e) {
+            Swal.fire('網路連線錯誤', '無法從後端獲取資料', 'error');
+          } finally {
+            setLoading(false);
+          }
         };
         init();
-      }, [profile?.userId]);
+      }, []);
 
       if (loading) {
         return (
-          <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-8 text-center">
-            <div className="loading-spinner mb-6"></div>
-            <h2 className="text-italian-green font-bold text-xl tracking-widest">{RESTAURANT_NAME}</h2>
-            <p className="text-gray-400 text-xs mt-3">正在載入美味資訊...</p>
-          </div>
+          React.createElement("div", { className: "fixed inset-0 bg-white flex flex-col items-center justify-center p-8 text-center" },
+            React.createElement("div", { className: "loading-spinner mb-6" }),
+            React.createElement("h2", { className: "text-lg font-bold text-[#2c5e50]" }, RESTAURANT_NAME),
+            React.createElement("p", { className: "text-gray-400 text-xs mt-3" }, "正在載入美味資訊...")
+          )
         );
       }
-
-      const HomeView = () => (
-        <div className="flex flex-col h-full bg-gray-50">
-          <div className="bg-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm h-14">
-            <h1 className="font-bold text-italian-green text-lg">{RESTAURANT_NAME}</h1>
-            {profile && <img src={profile.pictureUrl} className="w-8 h-8 rounded-full border border-italian-green" />}
-          </div>
-          <div className="flex-1 overflow-y-auto p-5 space-y-6">
-            <div className="relative h-44 rounded-2xl overflow-hidden shadow-lg">
-              <img src="https://i.ibb.co/qLFg7gSk/Gemini-Generated-Image-cmj4yzcmj4yzcmj4.png" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 flex items-end p-5">
-                <div className="text-white"><h3 className="font-bold text-xl">Buongiorno!</h3><p className="text-[10px] opacity-80 uppercase tracking-widest font-bold">金門道地義大利風味</p></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { id: 'MENU', name: '精選菜單', icon: 'menu', color: 'orange' },
-                { id: 'BOOKING', name: '線上訂位', icon: 'calendar', color: 'green' },
-                { id: 'LOCATION', name: '門市資訊', icon: 'map', color: 'blue' },
-                { id: 'MEMBER', name: '會員中心', icon: 'user', color: 'purple' },
-                { id: 'NEWS', name: '最新優惠', icon: 'gift', color: 'red' },
-                { id: 'FAQ', name: '常見問題', icon: 'chat', color: 'gray' }
-              ].map(btn => (
-                <button key={btn.id} onClick={() => setView(btn.id)} className="h-32 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:bg-gray-100 transition-colors">
-                  <div className={`w-10 h-10 bg-${btn.color}-50 rounded-full flex items-center justify-center text-${btn.color}-500`}><Icon name={btn.icon} className="w-6 h-6" /></div>
-                  <span className="font-bold text-gray-700 text-xs">{btn.name}</span>
-                </button>
-              ))}
-            </div>
-            <div className="py-10 text-center"><p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Since 2014</p></div>
-          </div>
-        </div>
+      
+      const BaseView = ({ title, children, onBack }) => (
+         React.createElement("div", { className: "flex flex-col h-full bg-white animate-fade-in" },
+            React.createElement("div", { className: "bg-[#2c5e50] text-white p-4 flex items-center shadow-md h-14 shrink-0" },
+              React.createElement("button", { onClick: onBack, className: "mr-3 p-1" }, React.createElement(Icon, { name: "back", className: "w-6 h-6" })),
+              React.createElement("h2", { className: "text-lg font-bold" }, title)
+            ),
+            React.createElement("div", { className: "flex-1 overflow-y-auto" }, children)
+          )
       );
 
-      const SimpleView = ({ title, children }) => (
-        <div className="flex flex-col h-full bg-white animate-fade-in">
-          <div className="bg-italian-green text-white p-4 flex items-center shadow-md h-14">
-            <button onClick={() => setView('HOME')} className="mr-3 p-1"><Icon name="back" className="w-6 h-6" /></button>
-            <h2 className="text-lg font-bold">{title}</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto">{children}</div>
-        </div>
-      );
-
-      switch(view) {
-        case 'MENU': return <SimpleView title="精選菜單"><div className="p-4 space-y-4"><img src="https://i.ibb.co/QFTKgJ1B/2023-03-25.webp" className="w-full rounded shadow" /><img src="https://i.ibb.co/hJ6cfgjM/2025-12-28.webp" className="w-full rounded shadow" /></div></SimpleView>;
-        case 'LOCATION': return <SimpleView title="門市資訊"><div className="p-6 space-y-6"><div className="w-full h-48 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">MAP</div><div className="space-y-4"><div className="flex gap-4"><Icon name="map" className="w-6 h-6 text-italian-green" /><div><h4 className="font-bold">地址</h4><p className="text-gray-600">金門縣金湖鎮太湖路二段3巷6號</p></div></div><div className="flex gap-4"><Icon name="calendar" className="w-6 h-6 text-italian-green" /><div><h4 className="font-bold">營業時間</h4><p className="text-gray-600">週二至週日 11:00-14:00/17:00-20:30</p></div></div></div><a href="tel:082332530" className="w-full bg-italian-dark text-white py-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg"><Icon name="phone" className="w-5 h-5" /> 撥打電話</a></div></SimpleView>;
-        case 'NEWS': return <SimpleView title="最新優惠"><div className="p-4 space-y-4">{data.promotions.map((p, i) => <div key={i} className="bg-white rounded-xl shadow-md border overflow-hidden"><img src={p.image} className="w-full h-40 object-cover" /><div className="p-4"><h3 className="font-bold">{p.title}</h3><p className="text-sm text-gray-500">{p.desc}</p></div></div>)}</div></SimpleView>;
-        case 'FAQ': return <SimpleView title="常見問題"><div className="p-4 space-y-3">{data.faqs.map((f, i) => <details key={i} className="bg-gray-50 rounded-xl border p-4 group"><summary className="font-bold cursor-pointer list-none flex justify-between items-center">{f.q}<Icon name="back" className="w-4 h-4 -rotate-90 group-open:rotate-90" /></summary><p className="text-sm text-gray-600 mt-2 pt-2 border-t">{f.a}</p></details>)}</div></SimpleView>;
-        case 'BOOKING': return <SimpleView title="線上訂位"><BookingForm profile={profile} onBack={() => setView('HOME')} /></SimpleView>;
-        case 'MEMBER': return <SimpleView title="會員中心"><MemberCard member={data.member} profile={profile} onUpdate={(m) => setData({...data, member: m})} /></SimpleView>;
-        default: return <HomeView />;
+      switch (view) {
+        case 'HOME': return React.createElement(HomeView, { setView, profile, data });
+        case 'MENU': return React.createElement(BaseView, { title: "精選菜單", onBack: () => setView('HOME') }, React.createElement(MenuView));
+        case 'LOCATION': return React.createElement(BaseView, { title: "門市資訊", onBack: () => setView('HOME') }, React.createElement(LocationView));
+        case 'NEWS': return React.createElement(BaseView, { title: "最新優惠", onBack: () => setView('HOME') }, React.createElement(NewsView, { promotions: data.promotions }));
+        case 'FAQ': return React.createElement(BaseView, { title: "常見問題", onBack: () => setView('HOME') }, React.createElement(FaqView, { faqs: data.faqs }));
+        case 'BOOKING': return React.createElement(BaseView, { title: "線上訂位", onBack: () => setView('HOME') }, React.createElement(BookingView, { member: data.member, userProfile: profile, onBack: () => setView('HOME') }));
+        case 'MEMBER': return React.createElement(BaseView, { title: "會員中心", onBack: () => setView('HOME') }, React.createElement(MemberView, { member: data.member, userProfile: profile, onRegister: (m) => setData({ ...data, member: m }) }));
+        default: return React.createElement(HomeView, { setView, profile, data });
       }
     };
-
-    const MemberCard = ({ member, profile, onUpdate }) => {
-      const [form, setForm] = useState({ name: profile?.displayName || '', phone: '' });
-      const handleReg = async (e) => {
-        e.preventDefault();
-        const res = await runGAS('register', { ...form, lineUserId: profile?.userId });
-        if (res.status === 'success') { onUpdate(res.member); Swal.fire('註冊成功!', '', 'success'); }
-        else Swal.fire(res.message, '', 'error');
-      };
-      if (member) return <div className="p-6"><div className="bg-gradient-to-br from-italian-green to-black p-6 rounded-2xl text-white shadow-xl relative overflow-hidden"><div className="text-xl font-bold mb-8">{RESTAURANT_NAME}</div><div className="flex justify-between items-end"><div><p className="text-sm opacity-80">{member.name}</p><p className="tracking-widest">{member.phone}</p></div><div className="text-right"><p className="text-[10px] opacity-60">POINTS</p><p className="text-2xl font-bold">{member.points}</p></div></div></div></div>;
-      return <form onSubmit={handleReg} className="p-6 space-y-4"><input placeholder="姓名" className="w-full p-3 border rounded-xl" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><input placeholder="手機號碼" className="w-full p-3 border rounded-xl" required value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} /><button className="w-full bg-italian-green text-white py-4 rounded-xl font-bold shadow-md">立即加入</button></form>;
-    };
-
-    const BookingForm = ({ profile, onBack }) => {
-      const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], time: '12:00', adults: 2, name: profile?.displayName || '', phone: '' });
-      const handleBooking = async (e) => {
-        e.preventDefault();
-        const res = await runGAS('booking', { ...form, lineUserId: profile?.userId });
-        if (res.status === 'success') { await Swal.fire('預約成功!', '我們會盡快為您安排', 'success'); onBack(); }
-        else Swal.fire(res.message, '', 'error');
-      };
-      return <form onSubmit={handleBooking} className="p-6 space-y-4"><input type="date" className="w-full p-3 border rounded-xl" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} /><input type="time" className="w-full p-3 border rounded-xl" value={form.time} onChange={e=>setForm({...form, time:e.target.value})} /><input type="number" placeholder="大人" className="w-full p-3 border rounded-xl" value={form.adults} onChange={e=>setForm({...form, adults:e.target.value})} /><input placeholder="聯絡大名" className="w-full p-3 border rounded-xl" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} /><input placeholder="電話" className="w-full p-3 border rounded-xl" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} /><button className="w-full bg-italian-red text-white py-4 rounded-xl font-bold shadow-lg">確認訂位</button></form>;
-    };
+    
+    const HomeView = ({ setView, profile, data }) => (
+      React.createElement("div", { className: "flex flex-col h-full bg-gray-50" },
+        React.createElement("div", { className: "bg-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-sm h-14 shrink-0" },
+          React.createElement("h1", { className: "font-bold text-[#2c5e50] text-lg" }, RESTAURANT_NAME),
+          profile && React.createElement("img", { src: profile.pictureUrl, className: "w-8 h-8 rounded-full border border-[#2c5e50]" })
+        ),
+        React.createElement("div", { className: "flex-1 overflow-y-auto p-5 space-y-6" },
+          React.createElement("div", { className: "relative h-44 rounded-2xl overflow-hidden shadow-lg" },
+            React.createElement("img", { src: "https://i.ibb.co/qLFg7gSk/Gemini-Generated-Image-cmj4yzcmj4yzcmj4.png", className: "w-full h-full object-cover" }),
+            React.createElement("div", { className: "absolute inset-0 bg-gradient-to-t from-black/70 flex items-end p-5 text-white" },
+              React.createElement("div", null,
+                React.createElement("h3", { className: "font-bold text-xl" }, "Buongiorno!"),
+                React.createElement("p", { className: "text-[10px] opacity-80 uppercase tracking-widest font-bold" }, "金門道地義大利風味")
+              )
+            )
+          ),
+          React.createElement("div", { className: "grid grid-cols-2 gap-4" },
+            [
+              { id: 'MENU', name: '精選菜單', icon: 'menu', color: 'orange' },
+              { id: 'BOOKING', name: '線上訂位', icon: 'calendar', color: 'green' },
+              { id: 'LOCATION', name: '門市資訊', icon: 'map', color: 'blue' },
+              { id: 'MEMBER', name: '會員中心', icon: 'user', color: 'purple' },
+              { id: 'NEWS', name: '最新優惠', icon: 'gift', color: 'red' },
+              { id: 'FAQ', name: '常見問題', icon: 'chat', color: 'gray' }
+            ].map(btn => (
+              React.createElement("button", { key: btn.id, onClick: () => setView(btn.id), className: "h-32 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2 active:bg-gray-100 transition-colors relative" },
+                React.createElement("div", { className: `w-10 h-10 bg-${btn.color}-50 rounded-full flex items-center justify-center text-${btn.color}-500`}, React.createElement(Icon, { name: btn.icon, className: "w-6 h-6" })),
+                React.createElement("span", { className: "font-bold text-gray-700 text-xs" }, btn.name),
+                (btn.id === 'MEMBER' && !data.member) && React.createElement("div", { className: "absolute top-4 right-4 w-2 h-2 bg-red-500 rounded-full animate-pulse" })
+              )
+            ))
+          ),
+          React.createElement("div", { className: "py-10 text-center" }, React.createElement("p", { className: "text-[10px] text-gray-300 font-bold uppercase tracking-widest" }, "Since 2014"))
+        )
+      )
+    );
+    
+    // --- 子畫面組件們 ---
+    const MenuView = () => React.createElement("div",{className:"p-4 space-y-4"}, React.createElement("img",{src:"https://i.ibb.co/QFTKgJ1B/2023-03-25.webp",className:"w-full rounded shadow"}), React.createElement("img",{src:"https://i.ibb.co/hJ6cfgjM/2025-12-28.webp",className:"w-full rounded shadow"}));
+    const LocationView = () => React.createElement("div",{className:"p-6 space-y-6"}, React.createElement("div",{className:"w-full h-48 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400"},"MAP"), React.createElement("div",{className:"space-y-4"}, React.createElement("div",{className:"flex gap-4"}, React.createElement(Icon,{name:"map",className:"w-6 h-6 text-[#2c5e50]"}), React.createElement("div",null, React.createElement("h4",{className:"font-bold"},"地址"), React.createElement("p",{className:"text-gray-600"},"金門縣金湖鎮太湖路二段3巷6號"))), React.createElement("div",{className:"flex gap-4"}, React.createElement(Icon,{name:"calendar",className:"w-6 h-6 text-[#2c5e50]"}), React.createElement("div",null, React.createElement("h4",{className:"font-bold"},"營業時間"), React.createElement("p",{className:"text-gray-600"},"週二至週日 11:00-14:00/17:00-20:30")))), React.createElement("a",{href:"tel:082332530",className:"w-full bg-gray-800 text-white py-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg"}, React.createElement(Icon,{name:"phone",className:"w-5 h-5"})," 撥打電話"));
+    const NewsView = ({promotions}) => React.createElement("div",{className:"p-4 space-y-4"}, promotions.map((p,i)=>React.createElement("div",{key:i,className:"bg-white rounded-xl shadow-md border overflow-hidden"}, React.createElement("img",{src:p.image,className:"w-full h-40 object-cover"}), React.createElement("div",{className:"p-4"}, React.createElement("h3",{className:"font-bold"},p.title), React.createElement("p",{className:"text-sm text-gray-500"},p.desc)))));
+    const FaqView = ({faqs}) => React.createElement("div",{className:"p-4 space-y-3"}, faqs.map((f,i)=>React.createElement("details",{key:i,className:"bg-gray-50 rounded-xl border p-4 group list-none"}, React.createElement("summary",{className:"font-bold cursor-pointer flex justify-between items-center"},f.q, React.createElement(Icon,{name:"chevronLeft",className:"w-4 h-4 -rotate-90 group-open:rotate-90 transition-transform"})), React.createElement("p",{className:"text-sm text-gray-600 mt-2 pt-2 border-t"},f.a))));
+    const BookingView = ({ member, userProfile, onBack }) => { const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], time: '12:00', adults: 2, children: 0, name: member?.name || userProfile?.displayName || '', phone: member?.phone || '' }); const [submitting, setSubmitting] = useState(false); const handleSubmit = async e => { e.preventDefault(); setSubmitting(true); const res = await runGAS('booking', { ...form, lineUserId: userProfile?.userId }); if(res.status === 'success') { await Swal.fire('預約成功', '我們將盡快為您安排', 'success'); onBack(); } else { Swal.fire('預約失敗', res.message, 'error'); } setSubmitting(false); }; return React.createElement("form",{onSubmit:handleSubmit, className:"p-6 space-y-4"}, React.createElement("input",{type:"date", className:"w-full p-3 border rounded-xl", value:form.date, onChange:e=>setForm({...form,date:e.target.value})}), React.createElement("input",{type:"time", className:"w-full p-3 border rounded-xl", value:form.time, onChange:e=>setForm({...form,time:e.target.value})}), React.createElement("input",{type:"number", placeholder:"大人", className:"w-full p-3 border rounded-xl", value:form.adults, onChange:e=>setForm({...form,adults:parseInt(e.target.value)})}), React.createElement("input",{type:"text", placeholder:"姓名", className:"w-full p-3 border rounded-xl", value:form.name, onChange:e=>setForm({...form,name:e.target.value})}), React.createElement("input",{type:"tel", placeholder:"電話", className:"w-full p-3 border rounded-xl", value:form.phone, onChange:e=>setForm({...form,phone:e.target.value})}), React.createElement("button",{type:"submit", disabled:submitting, className:"w-full bg-[#D32F2F] text-white py-4 rounded-xl font-bold shadow-lg"}, submitting ? "處理中..." : "確認訂位"));};
+    const MemberView = ({ member, userProfile, onRegister }) => { const [form, setForm] = useState({ name: userProfile?.displayName || '', phone: '' }); const [submitting, setSubmitting] = useState(false); const handleSubmit = async e => { e.preventDefault(); setSubmitting(true); const res = await runGAS('register', { ...form, lineUserId: userProfile?.userId }); if(res.status === 'success') { onRegister(res.member); Swal.fire('註冊成功!', '', 'success'); } else { Swal.fire('註冊失敗', res.message, 'error'); } setSubmitting(false); }; if(member) return React.createElement("div",{className:"p-6"}, React.createElement("div",{className:"bg-gradient-to-br from-[#2c5e50] to-black p-6 rounded-2xl text-white shadow-xl"}, React.createElement("div",{className:"text-xl font-bold mb-8"},RESTAURANT_NAME), React.createElement("div",{className:"flex justify-between items-end"}, React.createElement("div",null, React.createElement("p",{className:"text-sm opacity-80"},member.name), React.createElement("p",{className:"tracking-widest"},member.phone)), React.createElement("div",{className:"text-right"}, React.createElement("p",{className:"text-[10px] opacity-60"},"POINTS"), React.createElement("p",{className:"text-2xl font-bold"},member.points))))); return React.createElement("form",{onSubmit:handleSubmit, className:"p-6 space-y-4"}, React.createElement("h3",{className:"font-bold text-[#2c5e50] text-center text-xl"},"新會員註冊"), React.createElement("input",{type:"text", placeholder:"您的姓名", className:"w-full p-3 border rounded-xl", required:true, value:form.name, onChange:e=>setForm({...form,name:e.target.value})}), React.createElement("input",{type:"tel", placeholder:"手機號碼", className:"w-full p-3 border rounded-xl", required:true, value:form.phone, onChange:e=>setForm({...form,phone:e.target.value})}), React.createElement("button",{type:"submit", disabled:submitting, className:"w-full bg-[#2c5e50] text-white py-4 rounded-xl font-bold shadow-md"}, submitting ? "處理中..." : "立即加入")); };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    root.render(React.createElement(App));
   </script>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
 </head>
 <body>
   <div id="root"></div>
