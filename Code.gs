@@ -34,7 +34,15 @@ function getMemberByLineId(lineUserId) {
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i > 0; i--) {
     if (String(data[i][1]) === String(lineUserId)) {
-      return { name: data[i][2], phone: data[i][3], points: data[i][8] || 0 };
+      return { 
+        name: data[i][2], 
+        phone: data[i][3], 
+        birthday: data[i][4],
+        gender: data[i][5],
+        email: data[i][6],
+        address: data[i][7],
+        points: data[i][8] || 0 
+      };
     }
   }
   return null;
@@ -51,26 +59,57 @@ function getFaqList() {
 }
 
 function getPromotionsList() {
-  var sheet = getOrCreateSheet("最新優惠", ["ID", "標題", "內容", "圖片", "期限"]);
+  var sheet = getOrCreateSheet("最新優惠", ["圖片網址", "標題", "內容", "備註"]);
   var data = sheet.getDataRange().getValues();
   var list = [];
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][1]) list.push({ id: data[i][0], title: data[i][1], desc: data[i][2], image: data[i][3] });
+  if (data.length <= 1) {
+    // 預設內容
+    var defaultPromo = ["https://i.ibb.co/qLFg7gSk/Gemini-Generated-Image-cmj4yzcmj4yzcmj4.png", "歡慶APP啟動", "全面加入會員，完成會員任務即贈送薯條一份。", "限內用"];
+    sheet.appendRow(defaultPromo);
+    list.push({ image: defaultPromo[0], title: defaultPromo[1], desc: defaultPromo[2] });
+  } else {
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][1]) list.push({ image: data[i][0], title: data[i][1], desc: data[i][2] });
+    }
   }
-  return list.length ? list : [{title:"歡迎光臨薩諾瓦", desc:"加入會員即享積點優惠", image:"https://picsum.photos/400/200"}];
+  return list;
 }
 
 function registerMember(data) {
   var sheet = getOrCreateSheet("會員資料");
   var dateStr = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-  sheet.appendRow([dateStr, data.lineUserId || '', data.name, data.phone, '', '', '', '', 100]);
-  return { status: 'success', member: { name: data.name, phone: data.phone, points: 100 } };
+  sheet.appendRow([
+    dateStr, 
+    data.lineUserId || '', 
+    data.name, 
+    data.phone, 
+    data.birthday || '', 
+    data.gender || '', 
+    data.email || '', 
+    data.address || '', 
+    100
+  ]);
+  return { 
+    status: 'success', 
+    member: { name: data.name, phone: data.phone, points: 100 } 
+  };
 }
 
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "姓名", "電話", "備註", "LINE ID"]);
   var dateStr = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-  sheet.appendRow([dateStr, data.date, data.time, data.adults, data.children || 0, 0, data.name, data.phone, '', data.lineUserId || '']);
+  sheet.appendRow([
+    dateStr, 
+    data.date, 
+    data.time, 
+    data.adults, 
+    data.children || 0, 
+    data.highChairs || 0, 
+    data.name, 
+    data.phone, 
+    '', 
+    data.lineUserId || ''
+  ]);
   return { status: 'success' };
 }
 
