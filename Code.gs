@@ -13,8 +13,8 @@ function doPost(e) {
         result = {
           status: 'success',
           member: getMemberByLineId(lineUserId),
-          faqs: getSheetData("常見問題", ["問題", "回答"]),
-          promotions: getSheetData("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"])
+          faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
+          promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"])
         };
         break;
       case 'register': result = registerMember(params); break;
@@ -45,24 +45,21 @@ function doPost(e) {
 // ========================
 function getMemberByLineId(lineUserId) {
   if (!lineUserId) return null;
-  var data = getSheetData("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數"]);
-  var member = data.find(row => row.lineId === lineUserId);
-  return member || null;
+  var data = getSheetDataAsJson("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數"]);
+  return data.find(row => row['lineid'] === lineUserId) || null;
 }
 
-function getSheetData(sheetName, headers) {
+function getSheetDataAsJson(sheetName, headers) {
     var sheet = getOrCreateSheet(sheetName, headers);
     var values = sheet.getDataRange().getValues();
     if (values.length <= 1) return [];
     var headerRow = values[0];
     var jsonData = [];
     for (var i = 1; i < values.length; i++) {
-        var row = values[i];
+        var rowData = values[i];
         var obj = {};
         for (var j = 0; j < headerRow.length; j++) {
-            var key = headerRow[j].toLowerCase().replace(/\s/g, ''); // Simple key conversion
-             if(key === 'lineid') key = 'lineId'; // consistency
-            obj[key] = row[j];
+            obj[headerRow[j]] = rowData[j];
         }
         jsonData.push(obj);
     }
@@ -71,17 +68,16 @@ function getSheetData(sheetName, headers) {
 
 function getUserDataByLineId(lineUserId, sheetName) {
     if (!lineUserId) return [];
-    var data = getSheetData(sheetName, []); // Headers should already exist
-    return data.filter(row => row.lineId === lineUserId);
+    var data = getSheetDataAsJson(sheetName, []); // Headers should already exist
+    return data.filter(row => row['LINE ID'] === lineUserId);
 }
 
 function getStampCardStatus(lineUserId) {
     if (!lineUserId) return { stamps: 0 };
-    var data = getSheetData("集點卡", ["LINE ID", "點數"]);
-    var userStamps = data.find(row => row.lineId === lineUserId);
+    var data = getSheetDataAsJson("集點卡", ["LINE ID", "點數"]);
+    var userStamps = data.find(row => row['LINE ID'] === lineUserId);
     return userStamps ? userStamps.點數 : 0;
 }
-
 
 // ========================
 // Data Modification Functions
@@ -89,33 +85,47 @@ function getStampCardStatus(lineUserId) {
 function registerMember(data) {
   var sheet = getOrCreateSheet("會員資料");
   sheet.appendRow([ new Date(), data.lineUserId, data.name, data.phone, data.birthday, 100 ]);
-  // Add initial points to history
   addPoints(data.lineUserId, 100, "新會員註冊禮");
-  // Create stamp card
-  getOrCreateSheet("集點卡").appendRow([data.lineUserId, 0]);
+  getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
   return { status: 'success', member: getMemberByLineId(data.lineUserId) };
 }
 
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
-  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian, data.seating, data.occasion, data.name, data.phone, data.notes, '' ]);
+  sheet.appendRow([ new Date(), data.lineUserId, data.date, data.time, data.adults, data.children, data.highChairs, data.vegetarian ? '是' : '否', data.seating, data.occasion, data.name, data.phone, data.notes, '' ]);
   return { status: 'success', bookingId: sheet.getLastRow() };
 }
 
 function updateMember(data) {
-  // ... (Implementation to find row by lineUserId and update values)
-  return { status: 'success', member: getMemberByLineId(data.lineUserId) };
+  var sheet = getOrCreateSheet("會員資料");
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][1] === data.lineUserId) {
+      sheet.getRange(i + 1, 3).setValue(data.name);
+      sheet.getRange(i + 1, 4).setValue(data.phone);
+      sheet.getRange(i + 1, 5).setValue(data.birthday);
+      return { status: 'success', member: getMemberByLineId(data.lineUserId) };
+    }
+  }
+  return { status: 'error', message: '會員不存在' };
 }
 
 function deleteMember(data) {
-  // ... (Implementation to find and delete row by lineUserId)
-  return { status: 'success' };
+  var sheet = getOrCreateSheet("會員資料");
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i > 0; i--) {
+    if (values[i][1] === data.lineUserId) {
+      sheet.deleteRow(i + 1);
+      return { status: 'success' };
+    }
+  }
+  return { status: 'error', message: '會員不存在' };
 }
 
 function savePreOrder(data) {
   var sheet = getOrCreateSheet("訂位紀錄");
   var orderSummary = data.order.map(item => `${item.n} x${item.qty}`).join('; ');
-  sheet.getRange(data.bookingId, 14).setValue(orderSummary); // 14th column is '預點餐'
+  sheet.getRange(data.bookingId, 14).setValue(orderSummary);
   return { status: 'success' };
 }
 
@@ -139,7 +149,6 @@ function addPoints(lineUserId, points, reason) {
         }
     }
 }
-
 
 // ========================
 // Utility Function
