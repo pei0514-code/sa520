@@ -14,7 +14,9 @@ function doPost(e) {
           status: 'success',
           member: getMemberByLineId(lineUserId),
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
-          promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"])
+          promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
+          settings: getSystemSettings(),
+          bookingsSummary: getBookingsSummary()
         };
         break;
       case 'register': result = registerMember(params); break;
@@ -45,7 +47,7 @@ function doPost(e) {
 // ========================
 function getMemberByLineId(lineUserId) {
   if (!lineUserId) return null;
-  var data = getSheetDataAsJson("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數"]);
+  var data = getSheetDataAsJson("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
   return data.find(row => row['lineid'] === lineUserId) || null;
 }
 
@@ -79,12 +81,52 @@ function getStampCardStatus(lineUserId) {
     return userStamps ? userStamps.點數 : 0;
 }
 
+function getSystemSettings() {
+    var sheet = getOrCreateSheet("系統設定", ["Key", "Value"]);
+    var data = sheet.getDataRange().getValues();
+    var settings = {};
+    for (var i = 1; i < data.length; i++) {
+        settings[data[i][0]] = data[i][1];
+    }
+    // Default setting if not present
+    if (!settings["MaxCapacity"]) {
+        settings["MaxCapacity"] = 30;
+        sheet.appendRow(["MaxCapacity", 30]);
+    }
+    return settings;
+}
+
+function getBookingsSummary() {
+    var sheet = getOrCreateSheet("訂位紀錄", ["建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "座位偏好", "用餐目的", "姓名", "電話", "備註", "預點餐"]);
+    var data = sheet.getDataRange().getValues();
+    var summary = [];
+    
+    // Skip header
+    for (var i = 1; i < data.length; i++) {
+        var date = data[i][2];
+        var time = data[i][3];
+        var adults = Number(data[i][4]) || 0;
+        var children = Number(data[i][5]) || 0;
+        
+        // Simple date check: only summarize future dates or today
+        var d = new Date(date);
+        var today = new Date();
+        today.setHours(0,0,0,0);
+        
+        if (d >= today) {
+            var dateStr = d.toISOString().split('T')[0];
+            summary.push({ date: dateStr, time: time, count: adults + children });
+        }
+    }
+    return summary;
+}
+
 // ========================
 // Data Modification Functions
 // ========================
 function registerMember(data) {
-  var sheet = getOrCreateSheet("會員資料");
-  sheet.appendRow([ new Date(), data.lineUserId, data.name, data.phone, data.birthday, 100 ]);
+  var sheet = getOrCreateSheet("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
+  sheet.appendRow([ new Date(), data.lineUserId, data.name, data.phone, data.birthday, 100, data.gender, data.email ]);
   addPoints(data.lineUserId, 100, "新會員註冊禮");
   getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
   return { status: 'success', member: getMemberByLineId(data.lineUserId) };
@@ -104,6 +146,10 @@ function updateMember(data) {
       sheet.getRange(i + 1, 3).setValue(data.name);
       sheet.getRange(i + 1, 4).setValue(data.phone);
       sheet.getRange(i + 1, 5).setValue(data.birthday);
+      // Update gender and email if columns exist
+      if (values[0].length > 6) sheet.getRange(i + 1, 7).setValue(data.gender);
+      if (values[0].length > 7) sheet.getRange(i + 1, 8).setValue(data.email);
+      
       return { status: 'success', member: getMemberByLineId(data.lineUserId) };
     }
   }

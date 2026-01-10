@@ -87,11 +87,13 @@
     const App = () => {
       const [view, setView] = useState('HOME');
       const [loading, setLoading] = useState(true);
-      const [data, setData] = useState({ member: null, faqs: [], promotions: [] });
+      const [data, setData] = useState({ member: null, faqs: [], promotions: [], settings: {}, bookingsSummary: [] });
       const [profile, setProfile] = useState(null);
       const [currentBookingId, setCurrentBookingId] = useState(null);
       
-      const handleMemberUpdate = (member) => setData(prev => ({ ...prev, member }));
+      const handleMemberUpdate = (member) => {
+          setData(prev => ({ ...prev, member }));
+      };
       const handleMemberDelete = () => setData(prev => ({...prev, member: null}));
       const handleBookingSuccess = (bookingId) => {
         setCurrentBookingId(bookingId);
@@ -106,6 +108,8 @@
               await window.liff.init({ liffId: LIFF_ID });
               if (window.liff.isLoggedIn()) {
                 const p = await window.liff.getProfile();
+                const token = window.liff.getDecodedIDToken();
+                if(token && token.email) p.email = token.email; // Try get email
                 setProfile(p);
                 currentUserId = p.userId;
               }
@@ -143,7 +147,7 @@
         case 'LOCATION': return React.createElement(BaseView, { title: "店家資訊", onBack: goHome }, React.createElement(LocationView, { profile }));
         case 'NEWS': return React.createElement(BaseView, { title: "活動與優惠", onBack: goHome }, React.createElement(NewsView, { promotions: data.promotions }));
         case 'FAQ': return React.createElement(BaseView, { title: "常見問題", onBack: goHome }, React.createElement(FaqView, { faqs: data.faqs }));
-        case 'BOOKING': return React.createElement(BaseView, { title: "線上訂位", onBack: goHome }, React.createElement(BookingView, { member: data.member, profile, onBack: goHome, onBookingSuccess: handleBookingSuccess }));
+        case 'BOOKING': return React.createElement(BaseView, { title: "線上訂位", onBack: goHome }, React.createElement(BookingView, { member: data.member, profile, data, onBack: goHome, onBookingSuccess: handleBookingSuccess }));
         case 'MEMBER': return React.createElement(BaseView, { title: "會員中心", onBack: goHome }, React.createElement(MemberView, { member: data.member, profile, onMemberUpdate: handleMemberUpdate, onMemberDelete: handleMemberDelete, setView }));
         case 'PREORDER': return React.createElement(BaseView, { title: "預先點餐", onBack: goHome }, React.createElement(PreorderView, { bookingId: currentBookingId, onBack: goHome }));
         case 'MY_BOOKINGS': return React.createElement(BaseView, { title: "我的訂位", onBack: () => setView('MEMBER') }, React.createElement(MyBookingsView, { profile }));
@@ -195,7 +199,7 @@
       )
     );
     
-    // ... (MenuView, LocationView, NewsView, FaqView remain the same) ...
+    // ... (MenuView) ...
     const MenuView = () => {
         const [modalItem, setModalItem] = useState(null);
         const menuItems = [
@@ -263,7 +267,7 @@
             setSubmitting(false);
         };
 
-        return React.createElement("div", { className: "p-6 space-y-6" },
+        return React.createElement("div", { className: "p-6 space-y-6 pb-24" },
             React.createElement("iframe", { 
                 src: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3637.362799307897!2d118.4232238759325!3d24.43851537832669!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x34152b1b31278881%3A0xb355205561237a3!2z6JOu6K2v55m-576p5byD55m-5a62!5e0!3m2!1szh-TW!2stw!4v1716962838382!5m2!1szh-TW!2stw", 
                 className: "w-full h-64 rounded-xl border-0 shadow-md", allowFullScreen: "", loading: "lazy", referrerPolicy: "no-referrer-when-downgrade" 
@@ -290,7 +294,11 @@
                         React.createElement("button", { onClick: handleSubmitFeedback, disabled: submitting, className: "w-full bg-green-600 text-white py-2 rounded-lg disabled:bg-gray-400" }, submitting ? "傳送中..." : "送出"),
                         React.createElement("button", { onClick: () => setShowFeedback(false), className: "w-full bg-gray-200 py-2 rounded-lg" }, "取消")
                     )
-                )
+                ),
+            React.createElement("a", { href: "tel:082-332530", className: "fixed bottom-6 left-6 right-6 z-20 bg-[#2c5e50] text-white py-4 rounded-xl font-bold shadow-xl shadow-green-200 flex justify-center items-center gap-2 transition-all active:scale-95" },
+                React.createElement(Icon, { name: "phone", className: "w-5 h-5" }),
+                "撥打訂位專線"
+            )
         );
     };
 
@@ -318,49 +326,59 @@
         )
     );
 
-    const BookingView = ({ member, profile, onBack, onBookingSuccess }) => {
-        // Date Logic
-        const generateDates = () => {
-            const dates = [];
-            const today = new Date();
-            for (let i = 0; i < 14; i++) {
-                const date = new Date(today);
-                date.setDate(today.getDate() + i);
-                if (date.getDay() !== 1) { // Skip Monday
-                    dates.push(date);
-                }
-            }
-            return dates;
-        };
-        const availableDates = useMemo(() => generateDates(), []);
-        
+    const BookingView = ({ member, profile, data, onBack, onBookingSuccess }) => {
+        const today = new Date();
+        const [viewMonth, setViewMonth] = useState(today.toISOString().slice(0, 7)); // YYYY-MM
         const [form, setForm] = useState({ 
-            date: availableDates[0].toISOString().split('T')[0], 
-            time: '12:00', adults: 2, children: 0, highChairs: 0, 
+            date: today.toISOString().split('T')[0], 
+            time: '', adults: 2, children: 0, highChairs: 0, 
             name: member?.name || profile?.displayName || '', 
             phone: member?.phone || '', notes: '', vegetarian: false, 
             seating: '不指定', occasion: '無' 
         });
         const [submitting, setSubmitting] = useState(false);
+        const maxCapacity = data.settings?.MaxCapacity || 30;
+
+        // Generate dates based on selected month
+        const daysInMonth = useMemo(() => {
+            const [y, m] = viewMonth.split('-').map(Number);
+            const dates = [];
+            const days = new Date(y, m, 0).getDate();
+            for(let i = 1; i <= days; i++) {
+                const d = new Date(y, m - 1, i);
+                if (d >= new Date().setHours(0,0,0,0) && d.getDay() !== 1) { // Future & Not Monday
+                     dates.push(d);
+                }
+            }
+            return dates;
+        }, [viewMonth]);
 
         useEffect(() => {
-            if (form.highChairs > form.children) {
-                setForm(prev => ({ ...prev, highChairs: prev.children }));
+            if(daysInMonth.length > 0 && !daysInMonth.find(d => d.toISOString().split('T')[0] === form.date)) {
+                setForm(prev => ({ ...prev, date: daysInMonth[0].toISOString().split('T')[0] }));
             }
-        }, [form.children, form.highChairs]);
+        }, [daysInMonth]);
+
+        const getCapacityForSlot = (time) => {
+            const bookings = data.bookingsSummary || [];
+            const count = bookings
+                .filter(b => b.date === form.date && b.time === time)
+                .reduce((sum, b) => sum + b.count, 0);
+            return count;
+        };
+
+        const lunchSlots = ["11:00", "11:30", "12:00", "12:30", "13:00"];
+        const dinnerSlots = ["17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00"];
 
         const handleBooking = async e => {
             e.preventDefault();
+            if (!form.time) {
+                Swal.fire({ icon: 'warning', title: '請選擇時間', text: '請點選下方的用餐時段', confirmButtonColor: '#D32F2F' });
+                return;
+            }
             const phoneRegex = /^09\d{8}$/;
             if (!phoneRegex.test(form.phone)) {
                 Swal.fire({ icon: 'error', title: '電話號碼格式錯誤', text: '請輸入有效的 10 位手機號碼，必須以 09 開頭。', confirmButtonColor: '#D32F2F' });
-                return;
-            }
-            const time = form.time;
-            const isLunch = time >= '11:00' && time <= '13:00';
-            const isDinner = time >= '17:00' && time <= '20:00';
-            if (!isLunch && !isDinner) {
-                Swal.fire({ icon: 'error', title: '訂位失敗', text: '請選擇營業時段：11:00-13:00 或 17:00-20:00。', confirmButtonColor: '#D32F2F' });
                 return;
             }
             
@@ -423,28 +441,56 @@
             );
         };
 
+        const TimeSlotButton = ({ time }) => {
+            const currentCount = getCapacityForSlot(time);
+            const isFull = currentCount >= maxCapacity;
+            const isSelected = form.time === time;
+            
+            return React.createElement("button", {
+                type: "button",
+                onClick: () => !isFull && setForm({...form, time}),
+                disabled: isFull,
+                className: `px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
+                    isFull ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' :
+                    isSelected ? 'bg-[#2c5e50] text-white border-[#2c5e50] shadow-md' :
+                    'bg-white text-gray-700 border-gray-200 hover:border-[#2c5e50]'
+                }`
+            }, 
+                time,
+                isFull && React.createElement("span", {className: "block text-[10px] font-normal"}, "已滿")
+            );
+        };
+
         return React.createElement("form", { onSubmit: handleBooking, className: "p-6 space-y-6 pb-24" },
             // Time and Date Section
             React.createElement("div", { className: "bg-white p-5 rounded-2xl shadow-sm border border-gray-100" },
                 React.createElement("h3", { className: "font-bold text-gray-700 mb-4 flex items-center gap-2" }, 
                     React.createElement(Icon, { name: "calendar", className: "w-5 h-5 text-green-600" }), "用餐時間"
                 ),
-                React.createElement("div", { className: "mb-2" }, React.createElement("span", { className: "label-text" }, "選擇日期")),
+                React.createElement("div", { className: "mb-4 flex items-center gap-4" }, 
+                    React.createElement("span", { className: "label-text whitespace-nowrap" }, "選擇月份"),
+                    React.createElement("input", { type: "month", value: viewMonth, min: new Date().toISOString().slice(0, 7), onChange: e => setViewMonth(e.target.value), className: "input-field py-2" })
+                ),
+                React.createElement("div", { className: "mb-2" }, React.createElement("span", { className: "label-text" }, "選擇日期 (週一公休)")),
                 React.createElement("div", { className: "flex overflow-x-auto gap-3 pb-4 no-scrollbar -mx-2 px-2" },
-                    availableDates.map(d => {
+                    daysInMonth.map(d => {
                         const dateStr = d.toISOString().split('T')[0];
                         return React.createElement(DateCard, { 
                             key: dateStr, 
                             date: d, 
                             isSelected: form.date === dateStr, 
-                            onSelect: () => setForm({...form, date: dateStr}) 
+                            onSelect: () => setForm({...form, date: dateStr, time: ''}) 
                         });
                     })
                 ),
-                React.createElement("div", { className: "mt-4" },
-                    React.createElement("span", { className: "label-text" }, "選擇時間"),
-                    React.createElement("div", { className: "relative" },
-                         React.createElement("input", { type: "time", className: "input-field font-bold text-lg text-center tracking-widest", value: form.time, onChange: e => setForm({ ...form, time: e.target.value }) })
+                React.createElement("div", { className: "mt-4 space-y-3" },
+                    React.createElement("span", { className: "label-text" }, "午餐時段"),
+                    React.createElement("div", { className: "grid grid-cols-5 gap-2" },
+                        lunchSlots.map(t => React.createElement(TimeSlotButton, { key: t, time: t }))
+                    ),
+                    React.createElement("span", { className: "label-text mt-2 block" }, "晚餐時段"),
+                    React.createElement("div", { className: "grid grid-cols-5 gap-2" },
+                        dinnerSlots.map(t => React.createElement(TimeSlotButton, { key: t, time: t }))
                     )
                 )
             ),
@@ -537,7 +583,13 @@
 
       if (!member) {
         // Registration Form
-        const [regForm, setRegForm] = useState({ name: profile?.displayName || '', phone: '', birthday: ''});
+        const [regForm, setRegForm] = useState({ 
+            name: profile?.displayName || '', 
+            phone: '', 
+            birthday: '', 
+            gender: '男', 
+            email: profile?.email || '' 
+        });
         const [submitting, setSubmitting] = useState(false);
         const handleReg = async e => {
             e.preventDefault();
@@ -563,6 +615,15 @@
             ),
             React.createElement("div", null, React.createElement("span", { className: "label-text" }, "您的姓名"), React.createElement("input", { className: "input-field", required: true, value: regForm.name, onChange: e => setRegForm({ ...regForm, name: e.target.value }) })),
             React.createElement("div", null, React.createElement("span", { className: "label-text" }, "手機號碼"), React.createElement("input", { type: "tel", className: "input-field", required: true, value: regForm.phone, onChange: e => setRegForm({ ...regForm, phone: e.target.value }) })),
+            React.createElement("div", null, 
+                React.createElement("span", { className: "label-text" }, "性別"), 
+                React.createElement("select", { className: "input-field", value: regForm.gender, onChange: e => setRegForm({ ...regForm, gender: e.target.value }) },
+                    React.createElement("option", { value: "男" }, "男"),
+                    React.createElement("option", { value: "女" }, "女"),
+                    React.createElement("option", { value: "其他" }, "其他")
+                )
+            ),
+            React.createElement("div", null, React.createElement("span", { className: "label-text" }, "電子信箱"), React.createElement("input", { type: "email", className: "input-field", value: regForm.email, onChange: e => setRegForm({ ...regForm, email: e.target.value }) })),
             React.createElement("div", { className: "p-4 bg-green-50 rounded-2xl border border-dashed border-green-200" },
                React.createElement("span", { className: "label-text text-green-700" }, "🎂 生日驚喜"),
                React.createElement("input", { type: "date", className: "input-field border-green-200", required: true, value: regForm.birthday, onChange: e => setRegForm({ ...regForm, birthday: e.target.value }) }),
