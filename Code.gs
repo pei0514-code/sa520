@@ -22,6 +22,7 @@ function doPost(e) {
           seatInventory: getSheetDataAsJson("訂位資訊", ["日期", "時段", "可訂位人數", "已訂位人數", "剩餘空位"])
         };
         break;
+      case 'getAdminData': result = getAdminData(params); break; // New Admin Action
       case 'register': result = registerMember(params); break;
       case 'booking': result = saveBooking(params); break;
       case 'updateBooking': result = updateBooking(params); break;
@@ -189,6 +190,60 @@ function findBooking(params) {
                 vegetarian: data[i][8] === '是',
                 name: rowName,
                 phone: rowPhone,
+                notes: data[i][11],
+                preOrder: data[i][12]
+            });
+        }
+    }
+    return { status: 'success', bookings: results };
+}
+
+// ========================
+// Admin Functions
+// ========================
+function getAdminData(params) {
+    var member = getMemberByLineId(params.lineUserId);
+    var admins = ['0937942582', '0978375273', '0978375592'];
+    
+    // Normalize phone numbers: remove quotes and dashes
+    var userPhone = member ? String(member['電話']).replace(/^'/, '').replace(/-/g, '') : '';
+    
+    if (!member || !admins.includes(userPhone)) {
+        return { status: 'error', message: '無權限存取後台' };
+    }
+
+    var sheet = getOrCreateSheet("訂位紀錄");
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    var today = new Date();
+    today.setHours(0,0,0,0);
+
+    for (var i = 1; i < data.length; i++) {
+        var rowDate = new Date(data[i][3]);
+        
+        // Return today and future bookings
+        if (rowDate >= today) {
+            var dateStr = rowDate.getFullYear() + '-' + String(rowDate.getMonth()+1).padStart(2,'0') + '-' + String(rowDate.getDate()).padStart(2,'0');
+            var timeStr = data[i][4]; 
+            if (timeStr instanceof Date) {
+               timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
+            } else {
+               timeStr = String(timeStr).substring(0, 5);
+            }
+            
+            var phone = String(data[i][10]).replace(/^'/, '');
+
+            results.push({
+                id: i + 1,
+                bookingCode: data[i][0],
+                date: dateStr,
+                time: timeStr,
+                adults: data[i][5],
+                children: data[i][6],
+                highChairs: data[i][7],
+                vegetarian: data[i][8] === '是',
+                name: data[i][9],
+                phone: phone,
                 notes: data[i][11],
                 preOrder: data[i][12]
             });
