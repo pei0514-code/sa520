@@ -42,7 +42,8 @@
     import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
 
     const LIFF_ID = "2008861231-EA0Hpl68"; 
-    const RESTAURANT_NAME = "薩諾瓦訂位系統 Ver1.0"; 
+    // Updated display name variable, though mostly used in header now
+    const RESTAURANT_NAME = "薩諾瓦義式廚房"; 
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHOJOzIGqCnW-ttjB0_OeJ6eIz3iqF3dnYSwGeK4L2vRi6dEuWZ-i_DoM5pHjz9u7PlA/exec";
 
     const runGAS = async (action, params = {}) => {
@@ -112,14 +113,14 @@
       };
 
       return React.createElement("div", { className: "flex flex-col h-full bg-[#f8fafc]" },
-        React.createElement("div", { className: "bg-white p-5 sticky top-0 z-10 flex justify-between items-center shadow-sm h-18 shrink-0" },
+        React.createElement("div", { className: "bg-white p-6 sticky top-0 z-10 flex justify-between items-start shadow-sm shrink-0" },
           React.createElement("div", null,
-             React.createElement("p", { className: "text-xs text-gray-400 font-bold uppercase tracking-wider" }, RESTAURANT_NAME), 
-             React.createElement("h1", { className: "font-bold text-[#B91C1C] text-lg" }, 
+             React.createElement("h1", { className: "font-black text-gray-900 text-2xl tracking-wide leading-tight" }, RESTAURANT_NAME), 
+             React.createElement("p", { className: "text-sm text-gray-500 font-medium mt-1" }, 
                 profile?.displayName ? `${profile.displayName}, 您好` : "Welcome"
              )
           ),
-          profile && React.createElement("img", { src: profile.pictureUrl, className: "w-10 h-10 rounded-full border-2 border-[#B91C1C] shadow-sm" })
+          profile && React.createElement("img", { src: profile.pictureUrl, className: "w-12 h-12 rounded-full border-2 border-gray-100 shadow-sm" })
         ),
         React.createElement("div", { className: "flex-1 overflow-y-auto p-5 space-y-6" },
           React.createElement("div", { className: "relative h-56 rounded-3xl overflow-hidden shadow-2xl transform transition-all hover:scale-[1.01]" },
@@ -155,7 +156,8 @@
     const MenuView = ({ chefRecommendations }) => {
         const [modalItem, setModalItem] = useState(null);
         const [dishModal, setDishModal] = useState(null);
-        const [tab, setTab] = useState('FEATURED');
+        // Default to FULL menu
+        const [tab, setTab] = useState('FULL');
         const dishes = (chefRecommendations && chefRecommendations.length > 0) ? chefRecommendations : [];
         const menuItems = [
             { src: "https://i.ibb.co/XZQx4dWc/S-36053013-0.jpg", full: "https://i.ibb.co/TDV3qsnx/2025-page-0001.jpg", label: "菜單正面", filename: "sanova-menu-front.webp" },
@@ -164,12 +166,13 @@
 
         return React.createElement(React.Fragment, null,
             React.createElement("div", { className: "flex sticky top-0 bg-white z-10 shadow-sm" },
-                React.createElement("button", { onClick: () => setTab('FEATURED'), className: `flex-1 py-3 font-bold text-sm border-b-2 transition-colors ${tab === 'FEATURED' ? 'border-[#B91C1C] text-[#B91C1C]' : 'border-transparent text-gray-500'}`}, "主廚推薦"),
-                React.createElement("button", { onClick: () => setTab('FULL'), className: `flex-1 py-3 font-bold text-sm border-b-2 transition-colors ${tab === 'FULL' ? 'border-[#B91C1C] text-[#B91C1C]' : 'border-transparent text-gray-500'}`}, "完整菜單")
+                // Swapped order: FULL first, FEATURED second
+                React.createElement("button", { onClick: () => setTab('FULL'), className: `flex-1 py-3 font-bold text-sm border-b-2 transition-colors ${tab === 'FULL' ? 'border-[#B91C1C] text-[#B91C1C]' : 'border-transparent text-gray-500'}`}, "完整菜單"),
+                React.createElement("button", { onClick: () => setTab('FEATURED'), className: `flex-1 py-3 font-bold text-sm border-b-2 transition-colors ${tab === 'FEATURED' ? 'border-[#B91C1C] text-[#B91C1C]' : 'border-transparent text-gray-500'}`}, "主廚推薦")
             ),
             React.createElement("div", { className: "p-6 space-y-8" },
                 tab === 'FEATURED' ? 
-                React.createElement("div", { className: "space-y-4" },
+                React.createElement("div", { className: "space-y-4 animate-fade-in" },
                     dishes.length === 0 ? React.createElement("p", {className: "text-center text-gray-400"}, "目前沒有主廚推薦項目。") :
                     dishes.map((d, i) => React.createElement("div", { key: i, onClick: () => setDishModal(d), className: "bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 flex cursor-pointer hover:shadow-lg transition-shadow" },
                         React.createElement("img", { src: d['圖片網址'], className: "w-28 h-28 object-cover shrink-0" }),
@@ -180,14 +183,17 @@
                         )
                     ))
                 ) :
-                menuItems.map(item =>
-                    React.createElement("div", { key: item.src, className: "text-center" },
-                        React.createElement("p", { className: "font-bold text-gray-600 mb-2 text-sm" }, item.label),
-                        React.createElement("img", {
-                            src: item.src,
-                            className: "w-full rounded-lg shadow-lg cursor-pointer transition-transform hover:scale-105 duration-300",
-                            onClick: () => setModalItem(item)
-                        })
+                // Full Menu View
+                React.createElement("div", { className: "space-y-6 animate-fade-in" },
+                    menuItems.map(item =>
+                        React.createElement("div", { key: item.src, className: "text-center" },
+                            React.createElement("p", { className: "font-bold text-gray-600 mb-2 text-sm" }, item.label),
+                            React.createElement("img", {
+                                src: item.src,
+                                className: "w-full rounded-lg shadow-lg cursor-pointer transition-transform hover:scale-105 duration-300",
+                                onClick: () => setModalItem(item)
+                            })
+                        )
                     )
                 )
             ),
@@ -442,7 +448,7 @@
                         onBookingSuccess({
                             bookingId: res.bookingId, 
                             adults: form.adults, 
-                            children: form.children,
+                            children: form.children, 
                             preOrder: form.preOrder,
                             bookingMessageText: msg 
                         });
@@ -1170,38 +1176,6 @@
                     ),
                     React.createElement("div", { className: "p-4 border-t bg-white pb-safe" },
                         React.createElement("button", { onClick: addToCartFromModal, className: "w-full bg-[#B91C1C] text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200 active:scale-95 transition-transform" }, "加入購物車")
-                    )
-                )
-            ),
-            showCartModal && React.createElement("div", { className: "fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm animate-fade-in" },
-                React.createElement("div", { className: "bg-white w-full max-h-[85vh] rounded-t-3xl shadow-2xl flex flex-col animate-slide-up" },
-                    React.createElement("div", { className: "p-4 border-b border-gray-100 flex justify-between items-center" },
-                        React.createElement("h3", { className: "font-bold text-xl text-gray-800" }, "您的餐點"),
-                        React.createElement("button", { onClick: () => setShowCartModal(false), className: "p-2 bg-gray-100 rounded-full text-gray-600" }, React.createElement(Icon, {name: "chevronDown", className: "w-6 h-6"}))
-                    ),
-                    React.createElement("div", { className: "flex-1 overflow-y-auto p-4 space-y-4" },
-                        cart.map(item => React.createElement("div", { key: item.cartId, className: "flex justify-between items-start bg-white border-b border-gray-50 pb-2 last:border-0" },
-                            React.createElement("div", null, 
-                                React.createElement("p", { className: "font-bold text-gray-800" }, item.n), 
-                                React.createElement("div", { className: "text-xs text-gray-500 mt-1" },
-                                    item.noodle && React.createElement("span", {className:"mr-2"}, item.noodle),
-                                    item.spice && React.createElement("span", {className:"mr-2"}, item.spice),
-                                    item.combo > 0 && React.createElement("span", {className:"block text-[#B91C1C]"}, `+${comboOptions.find(c=>c.id===item.combo).n} (${item.drink})`)
-                                ),
-                                React.createElement("p", { className: "text-sm font-bold text-[#B91C1C] mt-1" }, `$${item.unitPrice}`)
-                            ),
-                            React.createElement("button", { onClick: () => removeFromCart(item.cartId), className: "text-gray-400 p-2" }, React.createElement(Icon, {name:"trash", className:"w-4 h-4"}))
-                        ))
-                    ),
-                    React.createElement("div", { className: "p-4 border-t border-gray-100 bg-gray-50 pb-safe" },
-                        React.createElement("div", { className: "flex justify-between items-center mb-4" },
-                            React.createElement("span", { className: "text-gray-600 font-bold" }, "總金額"),
-                            React.createElement("div", { className: "text-right" },
-                                React.createElement("span", { className: `font-bold text-2xl ${total < requiredTotal ? 'text-red-500' : 'text-[#B91C1C]'}` }, `$${total}`),
-                                total < requiredTotal && React.createElement("p", { className: "text-xs text-red-500 font-bold" }, `(未達低消，差$${requiredTotal - total})`)
-                            )
-                        ),
-                        React.createElement("button", { onClick: handleSubmit, className: `w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-all ${total < requiredTotal ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#B91C1C] shadow-red-200 active:scale-95'}` }, "確認預先點餐")
                     )
                 )
             )
