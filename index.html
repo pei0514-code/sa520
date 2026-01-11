@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>薩諾瓦義式廚房</title>
+  <title>薩諾瓦訂位系統</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -11,10 +11,9 @@
 
   <style>
     :root {
-      /* 修改品牌色為紅色系 */
-      --brand-main: #B91C1C; /* 深紅 */
-      --brand-light: #FEF2F2; /* 淺紅 */
-      --brand-accent: #EF4444; /* 亮紅 */
+      --brand-main: #B91C1C;
+      --brand-light: #FEF2F2;
+      --brand-accent: #EF4444;
       --bg-color: #f8fafc;
     }
     body { 
@@ -34,8 +33,6 @@
     .label-text { 
       @apply text-xs font-bold text-gray-500 mb-2 block uppercase tracking-wider ml-1; 
     }
-    
-    /* Hide scrollbar for horizontal scroll */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -44,8 +41,8 @@
     import React, { useState, useEffect, useMemo, useRef } from 'https://esm.sh/react@18.2.0';
     import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
 
-    const LIFF_ID = "2008861231-EA0Hpl68";
-    const RESTAURANT_NAME = "薩諾瓦訂位系統 Ver1.0"; // Updated Name
+    const LIFF_ID = "2008861231-EA0Hpl68"; 
+    const RESTAURANT_NAME = "薩諾瓦訂位系統 Ver1.0"; 
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHOJOzIGqCnW-ttjB0_OeJ6eIz3iqF3dnYSwGeK4L2vRi6dEuWZ-i_DoM5pHjz9u7PlA/exec";
 
     const runGAS = async (action, params = {}) => {
@@ -92,88 +89,9 @@
       );
     };
 
-    const App = () => {
-      const [view, setView] = useState('HOME');
-      const [loading, setLoading] = useState(true);
-      const [data, setData] = useState({ 
-        member: null, faqs: [], promotions: [], slotSettings: {}, 
-        bookingsSummary: [], chefRecommendations: [], restaurantMenu: [],
-        seatInventory: [] // New state for precise seat tracking
-      });
-      const [profile, setProfile] = useState(null);
-      const [currentBooking, setCurrentBooking] = useState(null);
-      
-      const handleMemberUpdate = (member) => {
-          setData(prev => ({ ...prev, member }));
-      };
-      const handleMemberDelete = () => setData(prev => ({...prev, member: null}));
-      const handleBookingSuccess = (booking) => {
-        setCurrentBooking(booking);
-        setView('PREORDER');
-      };
-
-      useEffect(() => {
-        const init = async () => {
-          let currentUserId = '';
-          try {
-            if (window.liff) {
-              await window.liff.init({ liffId: LIFF_ID });
-              if (window.liff.isLoggedIn()) {
-                const p = await window.liff.getProfile();
-                const token = window.liff.getDecodedIDToken();
-                if(token && token.email) p.email = token.email; 
-                setProfile(p);
-                currentUserId = p.userId;
-              }
-            }
-          } catch (e) { console.warn("LIFF init failed"); }
-
-          const res = await runGAS('getInitialData', { lineUserId: currentUserId });
-          if (res.status === 'success') setData(res);
-          setLoading(false);
-        };
-        init();
-      }, []);
-
-      if (loading) return (
-        React.createElement("div", { className: "fixed inset-0" },
-          React.createElement("img", { src: "https://i.ibb.co/93NGBjjh/IMG-6773.jpg", className: "w-full h-full object-cover" })
-        )
-      );
-
-      const BaseView = ({ title, children, onBack }) => (
-        React.createElement("div", { className: "flex flex-col h-screen bg-white animate-fade-in" },
-          /* 乳白色背景 + 紅色文字與圖示 */
-          React.createElement("div", { className: "bg-[#fdfbf7] text-[#B91C1C] p-4 flex items-center shadow-sm border-b border-[#B91C1C]/10 h-16 shrink-0 z-50" },
-            React.createElement("button", { onClick: onBack, className: "mr-3 p-2 rounded-full hover:bg-[#B91C1C]/10 transition-colors" }, React.createElement(Icon, { name: "back", className: "w-6 h-6" })),
-            React.createElement("h2", { className: "text-xl font-bold tracking-wide" }, title)
-          ),
-          React.createElement("div", { className: "flex-1 overflow-y-auto pb-safe" }, children)
-        )
-      );
-      
-      const goHome = () => setView('HOME');
-
-      switch(view) {
-        case 'HOME': return React.createElement(HomeView, { setView, profile, data });
-        case 'MENU': return React.createElement(BaseView, { title: "精緻菜單", onBack: goHome }, React.createElement(MenuView, { chefRecommendations: data.chefRecommendations }));
-        case 'LOCATION': return React.createElement(BaseView, { title: "店家資訊", onBack: goHome }, React.createElement(LocationView, { profile }));
-        case 'NEWS': return React.createElement(BaseView, { title: "活動與優惠", onBack: goHome }, React.createElement(NewsView, { promotions: data.promotions }));
-        case 'FAQ': return React.createElement(BaseView, { title: "常見問題", onBack: goHome }, React.createElement(FaqView, { faqs: data.faqs }));
-        case 'BOOKING': return React.createElement(BaseView, { title: "線上訂位", onBack: goHome }, React.createElement(BookingView, { member: data.member, profile, data, onBack: goHome, onBookingSuccess: handleBookingSuccess }));
-        case 'MEMBER': return React.createElement(BaseView, { title: "會員中心", onBack: goHome }, React.createElement(MemberView, { member: data.member, profile, onMemberUpdate: handleMemberUpdate, onMemberDelete: handleMemberDelete, setView }));
-        case 'PREORDER': return React.createElement(BaseView, { title: "預先點餐", onBack: goHome }, React.createElement(PreorderView, { booking: currentBooking, restaurantMenu: data.restaurantMenu, onBack: goHome }));
-        case 'MY_BOOKINGS': return React.createElement(BaseView, { title: "我的訂位", onBack: () => setView('MEMBER') }, React.createElement(MyBookingsView, { profile }));
-        case 'POINT_HISTORY': return React.createElement(BaseView, { title: "點數紀錄", onBack: () => setView('MEMBER') }, React.createElement(PointHistoryView, { profile }));
-        case 'COUPONS': return React.createElement(BaseView, { title: "我的優惠券", onBack: () => setView('MEMBER') }, React.createElement(CouponsView, { profile }));
-        case 'STAMP_CARD': return React.createElement(BaseView, { title: "集點卡", onBack: () => setView('MEMBER') }, React.createElement(StampCardView, { profile }));
-        default: return React.createElement(HomeView, { setView, profile, data });
-      }
-    };
-
+    // Components Definitions
     const HomeView = ({ setView, profile, data }) => {
       const handleNavClick = (id) => {
-        // Enforce member check for Booking
         if (id === 'BOOKING' && !data.member) {
           Swal.fire({
             title: '非會員無法線上訂位',
@@ -185,7 +103,7 @@
             cancelButtonText: '取消'
           }).then((result) => {
             if (result.isConfirmed) {
-                setView('MEMBER'); // Navigate to Member view which shows Registration form
+                setView('MEMBER'); 
             }
           });
           return;
@@ -196,7 +114,7 @@
       return React.createElement("div", { className: "flex flex-col h-full bg-[#f8fafc]" },
         React.createElement("div", { className: "bg-white p-5 sticky top-0 z-10 flex justify-between items-center shadow-sm h-18 shrink-0" },
           React.createElement("div", null,
-             React.createElement("p", { className: "text-xs text-gray-400 font-bold uppercase tracking-wider" }, RESTAURANT_NAME), // Updated Title
+             React.createElement("p", { className: "text-xs text-gray-400 font-bold uppercase tracking-wider" }, RESTAURANT_NAME), 
              React.createElement("h1", { className: "font-bold text-[#B91C1C] text-lg" }, 
                 profile?.displayName ? `${profile.displayName}, 您好` : "Welcome"
              )
@@ -233,8 +151,7 @@
       )
     );
     };
-    
-    // ... MenuView remains same ...
+
     const MenuView = ({ chefRecommendations }) => {
         const [modalItem, setModalItem] = useState(null);
         const [dishModal, setDishModal] = useState(null);
@@ -330,7 +247,6 @@
     };
 
     const LocationView = ({ profile }) => {
-        // Feedback moved to MemberView
         return React.createElement("div", { className: "p-6 space-y-6 pb-24" },
             React.createElement("iframe", { 
                 src: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3637.373403565137!2d118.42103517593254!3d24.43813957833075!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x34152b1b31278881%3A0xb355205561237a3!2z6JOu6K2v55m-576p5byD55m-5a625Yqq5aSn5Yip6aSQ5bqr!5e0!3m2!1szh-TW!2stw!4v1709400000000!5m2!1szh-TW!2stw", 
@@ -352,7 +268,6 @@
         );
     };
 
-    // ... NewsView, FaqView remain same ...
     const NewsView = ({ promotions }) => {
         const [filter, setFilter] = useState('ALL');
         const filtered = filter === 'ALL' ? promotions : promotions.filter(p => p['類型'] === filter);
@@ -385,12 +300,12 @@
         )
     );
 
-    const BookingView = ({ member, profile, data, onBack, onBookingSuccess }) => {
+    const BookingView = ({ member, profile, data, setData, onBack, onBookingSuccess }) => {
         const [mode, setMode] = useState('CREATE');
         const today = new Date();
         const [viewMonth, setViewMonth] = useState(today.toISOString().slice(0, 7));
         const [form, setForm] = useState({ 
-            date: '', // Default to empty to force selection
+            date: '', 
             time: '', adults: 2, children: 0, highChairs: 0, 
             name: member?.name || profile?.displayName || '', 
             phone: member?.phone || '', notes: '', vegetarian: false, 
@@ -443,21 +358,10 @@
             localStorage.setItem('booking_search_info', JSON.stringify(searchForm));
         }, [searchForm]);
 
-        // Updated getSlotInfo to use the precise seatInventory from backend
         const getSlotInfo = (time) => {
             const defaultMax = slotSettings[time] ? slotSettings[time].max : 30;
-            
-            // Check if there is specific inventory data for this date and time
             if (form.date && data.seatInventory) {
-                const inventory = data.seatInventory.find(
-                    item => {
-                        // Handle date format comparison carefully
-                        const itemDate = new Date(item['日期']).toISOString().split('T')[0];
-                        const itemTime = String(item['時段']).substring(0, 5);
-                        return itemDate === form.date && itemTime === time;
-                    }
-                );
-                
+                const inventory = data.seatInventory.find(item => item['日期'] === form.date && item['時段'].startsWith(time));
                 if (inventory) {
                     return { 
                         max: Number(inventory['可訂位人數']), 
@@ -466,8 +370,6 @@
                     };
                 }
             }
-            
-            // Fallback to default if no specific inventory record exists (assume 0 booked)
             return { max: defaultMax, booked: 0, remaining: defaultMax };
         };
 
@@ -502,6 +404,25 @@
             const res = await runGAS(action, { ...form, lineUserId: profile?.userId });
             
             if (res.status === 'success') {
+                // Optimistic UI Update for Inventory
+                const updatedInventory = data.seatInventory ? [...data.seatInventory] : [];
+                const targetIndex = updatedInventory.findIndex(i => i['日期'] === form.date && i['時段'].startsWith(form.time));
+                const peopleCount = form.adults + form.children;
+                
+                if (targetIndex >= 0) {
+                    updatedInventory[targetIndex]['已訂位人數'] = Number(updatedInventory[targetIndex]['已訂位人數']) + peopleCount;
+                    updatedInventory[targetIndex]['剩餘空位'] = Number(updatedInventory[targetIndex]['剩餘空位']) - peopleCount;
+                } else {
+                    updatedInventory.push({ 
+                        '日期': form.date, 
+                        '時段': form.time, 
+                        '可訂位人數': 30, 
+                        '已訂位人數': peopleCount, 
+                        '剩餘空位': 30 - peopleCount 
+                    });
+                }
+                setData(prev => ({ ...prev, seatInventory: updatedInventory }));
+
                 const bookingCode = res.bookingCode || '查詢中';
                 const msg = mode === 'EDIT' 
                     ? `📝 薩諾瓦訂位修改確認：\n訂位代號：${bookingCode}\n日期：${form.date}\n時間：${form.time}\n人數：${form.adults}大${form.children}小\n姓名：${form.name}\n電話：${form.phone}\n您的訂位已更新！`
@@ -536,7 +457,6 @@
             setSubmitting(false);
         };
 
-        // ... handleQuickCancel, handleCancel, handleSearch, handleEditClick ...
         const handleQuickCancel = async (bookingId, info) => {
             Swal.fire({
                 title: '確定取消訂位?',
@@ -712,7 +632,6 @@
                     )
                 )
             ),
-            // ... People and Contact inputs remain ...
             React.createElement("div", { className: "bg-white p-5 rounded-2xl shadow-sm border border-gray-100" },
                 React.createElement("h3", { className: "font-bold text-gray-700 mb-4 flex items-center gap-2" }, React.createElement(Icon, { name: "user", className: "w-5 h-5 text-purple-600" }), "人數與需求"),
                 React.createElement("div", { className: "flex justify-between items-center mb-6" },
@@ -800,7 +719,6 @@
             setSubmittingFeedback(false);
       };
 
-      // Registration Form ...
       if (!member) {
         const [regForm, setRegForm] = useState({ 
             name: profile?.displayName || '', phone: '', birthday: '', gender: '男', email: profile?.email || '' 
@@ -908,7 +826,6 @@
                 )
             )
         ),
-        /* Feedback Section Moved Here */
         React.createElement("div", { className: "mt-6" },
             !showFeedback ? 
                 React.createElement("button", { onClick: () => setShowFeedback(true), className: "w-full bg-yellow-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-yellow-200" }, React.createElement(Icon, {name:"star", className:"w-5 h-5"}), "填寫用餐回饋 (完食後)")
@@ -926,6 +843,369 @@
                 )
         )
       );
+    };
+
+    const MyBookingsView = ({ profile }) => {
+        const [bookings, setBookings] = useState([]);
+        const [loading, setLoading] = useState(true);
+        useEffect(() => {
+            if(!profile) return;
+            runGAS('getUserBookings', { lineUserId: profile.userId })
+                .then(res => {
+                    if (res.status === 'success') setBookings(res.bookings.reverse());
+                })
+                .finally(() => setLoading(false));
+        }, [profile]);
+
+        if (loading) return React.createElement("p", {className: "text-center p-8"}, "讀取中...");
+        if (bookings.length === 0) return React.createElement("p", {className: "text-center text-gray-500 p-8"}, "您目前沒有任何訂位紀錄。");
+
+        return React.createElement("div", {className: "p-4 space-y-4"},
+            bookings.map((b, i) => {
+                let dateDisplay = b['預約日期'];
+                try {
+                    const dateObj = new Date(b['預約日期']);
+                    if (!isNaN(dateObj.getTime())) {
+                        dateDisplay = dateObj.toLocaleDateString();
+                    }
+                } catch(e) {}
+
+                return React.createElement("div", {key: i, className: "bg-white p-4 rounded-xl shadow-sm border border-gray-100"},
+                    React.createElement("div", { className: "flex justify-between items-start" },
+                        React.createElement("div", null,
+                            React.createElement("div", { className: "flex items-center gap-2 mb-1" },
+                                React.createElement("span", { className: "text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono" }, b['訂位代號'] || '---'),
+                                React.createElement("p", {className: "font-bold text-lg text-gray-800"}, dateDisplay)
+                            ),
+                            React.createElement("p", {className: "text-[#B91C1C] font-bold"}, b['預約時間'])
+                        ),
+                        React.createElement("span", { className: "bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded" }, `${b['大人']}大${b['小孩']}小`)
+                    ),
+                    b['預點餐'] && React.createElement("div", {className: "mt-3 pt-3 border-t border-dashed border-gray-200"},
+                        React.createElement("p", {className: "text-xs text-gray-500 mb-1"}, "預點餐點"),
+                        React.createElement("p", {className: "text-sm text-gray-700 whitespace-pre-wrap"}, b['預點餐'].replace(/;/g, '\n'))
+                    )
+                );
+            })
+        );
+    };
+
+    const PointHistoryView = ({ profile }) => {
+        const [history, setHistory] = useState([]);
+        const [loading, setLoading] = useState(true);
+        useEffect(() => {
+            if(!profile) return;
+            runGAS('getPointHistory', { lineUserId: profile.userId })
+                .then(res => { if (res.status === 'success') setHistory(res.history.reverse()); })
+                .finally(() => setLoading(false));
+        }, [profile]);
+        
+        if (loading) return React.createElement("p", {className: "text-center p-8"}, "讀取中...");
+        if (history.length === 0) return React.createElement("p", {className: "text-center text-gray-500 p-8"}, "您沒有任何點數紀錄。");
+        return React.createElement("div", {className: "p-4 space-y-2"}, history.map((h, i) => React.createElement("div", {key: i, className: "flex justify-between items-center p-4 bg-white rounded-xl border border-gray-100"}, React.createElement("div", null, React.createElement("p", {className: "font-bold text-gray-800"}, h.說明), React.createElement("p", {className: "text-xs text-gray-400 mt-0.5"}, new Date(h.時間).toLocaleString())), React.createElement("p", {className: `font-bold text-lg ${h.點數變化 > 0 ? 'text-green-600' : 'text-red-600'}`}, `${h.點數變化 > 0 ? '+' : ''}${h.點數變化}`))));
+    };
+
+    const CouponsView = ({ profile }) => {
+         const mockCoupons = [{ id: 1, title: '生日95折券', desc: '限生日當月使用乙次', expiry: '2024-12-31' }, { id: 2, title: '薯條兌換券', desc: '消費滿$500即可使用', expiry: '2024-08-31' }];
+         const [usedCoupons, setUsedCoupons] = useState(() => {
+             try { return JSON.parse(localStorage.getItem('used_coupons') || '[]'); } catch(e) { return []; }
+         });
+
+         const handleRedeem = (coupon) => {
+             Swal.fire({
+                 title: '請店員輸入核銷碼',
+                 input: 'password',
+                 inputAttributes: { autocapitalize: 'off', placeholder: '預設: 8888' },
+                 showCancelButton: true,
+                 confirmButtonText: '確認核銷',
+                 confirmButtonColor: '#B91C1C',
+                 showLoaderOnConfirm: true,
+                 preConfirm: (code) => {
+                     if (code === '8888') {
+                         return true;
+                     } else {
+                         Swal.showValidationMessage('核銷碼錯誤');
+                     }
+                 }
+             }).then((result) => {
+                 if (result.isConfirmed) {
+                     const newUsed = [...usedCoupons, coupon.id];
+                     setUsedCoupons(newUsed);
+                     localStorage.setItem('used_coupons', JSON.stringify(newUsed));
+                     Swal.fire({ title: '核銷成功', icon: 'success', timer: 1500, showConfirmButton: false });
+                 }
+             });
+         };
+
+         return React.createElement("div", {className: "p-4 space-y-4"}, mockCoupons.map((c, i) => {
+             const isUsed = usedCoupons.includes(c.id);
+             return React.createElement("div", {key: i, className: `relative border-l-4 p-4 rounded-r-xl shadow-sm flex items-center gap-4 ${isUsed ? 'bg-gray-100 border-gray-400 opacity-60' : 'bg-white border-yellow-400'}`}, 
+                React.createElement("div", { className: `p-2 rounded-full ${isUsed ? 'bg-gray-200 text-gray-500' : 'bg-yellow-50 text-yellow-500'}`}, React.createElement(Icon, {name: 'ticket', className: 'w-6 h-6'})), 
+                React.createElement("div", { className: "flex-1" }, 
+                    React.createElement("p", {className: "font-bold text-gray-800"}, c.title), 
+                    React.createElement("p", {className: "text-xs text-gray-500 mt-1"}, c.desc), 
+                    React.createElement("p", {className: "text-[10px] text-gray-400 mt-1"}, `有效期限：${c.expiry}`)
+                ), 
+                isUsed ? 
+                React.createElement("div", { className: "text-xs font-bold text-gray-500 border border-gray-400 px-3 py-1 rounded-full transform -rotate-12" }, "已使用") :
+                React.createElement("button", { onClick: () => handleRedeem(c), className: "text-xs bg-gray-800 text-white px-3 py-1.5 rounded-full hover:bg-gray-700 active:scale-95" }, "使用")
+             );
+         }));
+    };
+
+    const StampCardView = () => {
+        const totalStamps = 10; const currentStamps = 6;
+        return React.createElement("div", {className: "p-6"}, React.createElement("div", {className: "bg-white p-6 rounded-2xl shadow-lg border border-gray-100"}, React.createElement("div", { className: "text-center mb-6" }, React.createElement("h3", {className: "font-bold text-xl text-[#B91C1C]"}, "消費集點卡"), React.createElement("p", {className: "text-xs text-gray-500 mt-2"}, "單筆消費滿 $300 累積 1 點，集滿 10 點兌換好禮")), React.createElement("div", {className: "grid grid-cols-5 gap-4 mb-6"}, [...Array(totalStamps)].map((_, i) => React.createElement("div", {key: i, className: `aspect-square rounded-full flex items-center justify-center border-2 ${i < currentStamps ? 'bg-yellow-400 border-yellow-400' : 'bg-gray-50 border-gray-200'}`}, i < currentStamps && React.createElement(Icon, {name: 'star', className: 'w-5 h-5 text-white fill-current'})))), React.createElement("div", { className: "w-full bg-gray-100 rounded-full h-2.5 mb-2" }, React.createElement("div", { className: "bg-[#B91C1C] h-2.5 rounded-full", style: { width: `${(currentStamps/totalStamps)*100}%` } })), React.createElement("p", {className: "text-right text-xs font-bold text-[#B91C1C]"}, `進度：${currentStamps} / ${totalStamps}`)));
+    };
+
+    const PreorderView = ({ booking, restaurantMenu, onBack }) => {
+        const fallbackMenu = [
+            { category: "義大利麵", sub: "主廚推薦", n: "宮保辣味雞丁義大利麵", p: 0 }, 
+            { category: "義大利麵", sub: "主廚推薦", n: "極品X.O醬海鮮義大利麵", p: 250, special: true },
+            { category: "義大利麵", sub: "主廚推薦", n: "墨魚汁海鮮墨魚麵", p: 260, special: true },
+            { category: "義大利麵", sub: "白醬", n: "奶油培根義大利麵", p: 170 },
+            { category: "義大利麵", sub: "白醬", n: "奶油蛤蜊義大利麵", p: 220 },
+            { category: "義大利麵", sub: "茄汁", n: "波隆那肉醬義大利麵", p: 170, tags: ['牛'] },
+            { category: "義式燉飯", sub: "基本款", n: "南瓜時蔬燉飯", p: 180, tags: ['素'] },
+            { category: "PIZZA", sub: "", n: "義式肉醬野菇披薩", p: 160, tags: ['牛'] },
+            { category: "單點", sub: "炸物", n: "麥克雞塊", p: 80 },
+            { category: "飲品", sub: "", n: "可樂", p: 50 },
+        ];
+
+        const menuItems = (restaurantMenu && restaurantMenu.length > 0) 
+            ? restaurantMenu.map(i => ({ category: i['類別'], sub: i['子類別'], n: i['產品名稱'], p: Number(i['產品價格']), img: i['圖片網址'], tags: i['標籤'] ? i['標籤'].split(',') : [] })) 
+            : fallbackMenu;
+
+        const categories = ["義大利麵", "義式燉飯", "焗烤", "PIZZA", "單點", "飲品"];
+        const [activeCategory, setActiveCategory] = useState(categories[0]);
+        const [cart, setCart] = useState([]);
+        const [showCartModal, setShowCartModal] = useState(false);
+        const [selectedItem, setSelectedItem] = useState(null); 
+        const [itemOptions, setItemOptions] = useState({ noodle: '筆尖麵', spice: '不辣', combo: 0, drink: '' });
+
+        const noodleOptions = [
+            { n: "筆尖麵", p: 0 }, { n: "天使細麵", p: 10 }, { n: "通心麵", p: 10 }, { n: "細扁麵", p: 10 }, { n: "墨魚麵", p: 40 }
+        ];
+        const spiceOptions = ["不辣", "小辣", "中辣", "大辣"];
+        const comboOptions = [
+            { id: 0, n: "單點", p: 0 },
+            { id: 1, n: "超值套餐", p: 80, desc: "含飲品" },
+            { id: 2, n: "酥皮套餐", p: 130, desc: "含飲品+酥皮濃湯" }
+        ];
+        const drinkOptions = menuItems.filter(i => i.category === "飲品").map(i => i.n);
+
+        const openItemModal = (item) => {
+            setSelectedItem(item);
+            setItemOptions({ 
+                noodle: (item.category === "義大利麵") ? '筆尖麵' : '', 
+                spice: '不辣', 
+                combo: 0, 
+                drink: '' 
+            });
+        };
+
+        const addToCartFromModal = () => {
+            if (itemOptions.combo > 0 && !itemOptions.drink) {
+                Swal.fire({ icon: 'warning', title: '請選擇飲料', text: '套餐必須選擇飲品', confirmButtonColor: '#B91C1C' });
+                return;
+            }
+            const itemTotal = selectedItem.p + (itemOptions.combo === 1 ? 80 : itemOptions.combo === 2 ? 130 : 0) + (noodleOptions.find(n=>n.n === itemOptions.noodle)?.p || 0);
+            const newItem = {
+                ...selectedItem, ...itemOptions, unitPrice: itemTotal, qty: 1, cartId: Date.now() 
+            };
+            setCart(prev => [...prev, newItem]);
+            setSelectedItem(null);
+            Swal.fire({ icon: 'success', title: '已加入購物車', showConfirmButton: false, timer: 800 });
+        };
+
+        const removeFromCart = (cartId) => {
+            setCart(prev => prev.filter(i => i.cartId !== cartId));
+        };
+
+        const total = useMemo(() => cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0), [cart]);
+        const minChargePerPerson = 60;
+        const payingPeople = parseInt(booking?.adults) || 0; 
+        const requiredTotal = minChargePerPerson * payingPeople;
+
+        const handleSubmit = async () => {
+            if (total < requiredTotal) {
+                 Swal.fire({ 
+                     icon: 'warning', 
+                     title: '未達低消', 
+                     text: `每人低消 $${minChargePerPerson} (不含兒童)。\n目前計費人數 ${payingPeople} 人，總金額需達 $${requiredTotal}。\n還差 $${requiredTotal - total}。`, 
+                     confirmButtonColor: '#D32F2F' 
+                 });
+                 return;
+            }
+
+            const res = await runGAS('savePreOrder', { bookingId: booking.bookingId, order: cart });
+            if(res.status === 'success') {
+                if (window.liff.isInClient()) {
+                    const orderText = cart.map(i => {
+                        let desc = `${i.n}`;
+                        if(i.noodle) desc += `(${i.noodle})`;
+                        if(i.spice) desc += `[${i.spice}]`;
+                        if(i.combo) desc += `+${comboOptions.find(c=>c.id===i.combo).n}`;
+                        if(i.drink) desc += `/${i.drink}`;
+                        desc += ` x${i.qty}`;
+                        return desc;
+                    }).join('\n');
+                    const fullMessage = booking.bookingMessageText + `\n\n🍔 預點餐點確認：\n${orderText}\n\n預點金額：$${total}`;
+                    await window.liff.sendMessages([{ type: 'text', text: fullMessage }]).catch(console.error);
+                }
+                setShowCartModal(false);
+                await Swal.fire({ icon: 'success', title: '預先點餐成功', text: '您的點餐紀錄已儲存，期待您的光臨！', confirmButtonColor: '#B91C1C'});
+                onBack();
+            } else {
+                 Swal.fire({ icon: 'error', title: '點餐失敗', text: res.message, confirmButtonColor: '#D32F2F' });
+            }
+        };
+
+        const filteredItems = menuItems.filter(i => i.category === activeCategory);
+        const groupedItems = filteredItems.reduce((acc, item) => {
+            const key = item.sub || '其它';
+            if(!acc[key]) acc[key] = [];
+            acc[key].push(item);
+            return acc;
+        }, {});
+
+        return React.createElement("div", { className: "flex h-full relative" },
+            React.createElement("div", { className: "w-[26%] bg-gray-50 overflow-y-auto border-r border-gray-100 pb-24" },
+                categories.map(cat => React.createElement("button", { key: cat, onClick: () => setActiveCategory(cat), className: `w-full text-left px-2 py-4 text-xs font-bold transition-all border-l-4 ${activeCategory === cat ? 'bg-white text-[#B91C1C] border-[#B91C1C] shadow-sm' : 'text-gray-500 border-transparent hover:bg-gray-100'}` }, cat))
+            ),
+            React.createElement("div", { className: "w-[74%] p-4 overflow-y-auto pb-36 bg-white" },
+                React.createElement("div", { className: "bg-red-50 p-2 mb-4 rounded-lg text-[10px] text-red-700 font-bold border border-red-100 flex items-center gap-1" }, 
+                   React.createElement(Icon, {name:"info", className:"w-3 h-3"}), `低消提醒：共需 $${requiredTotal}`
+                ),
+                Object.keys(groupedItems).map(sub => 
+                    React.createElement("div", { key: sub, className: "mb-6" },
+                        sub !== '其它' && React.createElement("h4", { className: "font-bold text-gray-400 text-sm mb-2 sticky top-0 bg-white py-1" }, sub),
+                        React.createElement("div", { className: "space-y-3" },
+                            groupedItems[sub].map((item, idx) => 
+                                React.createElement("div", { key: idx, onClick: () => openItemModal(item), className: "flex bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden active:scale-95 transition-transform cursor-pointer" },
+                                    item.img && React.createElement("img", { src: item.img, className: "w-20 h-20 object-cover" }),
+                                    React.createElement("div", { className: "p-2 flex-1 flex flex-col justify-between" },
+                                        React.createElement("div", null,
+                                            React.createElement("p", { className: "font-bold text-gray-800 text-sm leading-tight" }, item.n),
+                                            React.createElement("div", { className: "flex gap-1 mt-1 flex-wrap" },
+                                                item.tags && item.tags.includes('辣') && React.createElement("span", { className: "text-[9px] bg-red-100 text-red-600 px-1 rounded" }, "🌶️"),
+                                                item.tags && item.tags.includes('牛') && React.createElement("span", { className: "text-[9px] bg-amber-100 text-amber-700 px-1 rounded" }, "🐮"),
+                                                item.tags && item.tags.includes('素') && React.createElement("span", { className: "text-[9px] bg-green-100 text-green-700 px-1 rounded" }, "🥦")
+                                            )
+                                        ),
+                                        React.createElement("div", { className: "flex justify-between items-end" },
+                                            React.createElement("p", { className: "font-bold text-[#B91C1C]" }, `$${item.p}`),
+                                            React.createElement("div", { className: "bg-[#B91C1C] text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-lg" }, "+")
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            ),
+            cart.length > 0 && !showCartModal && !selectedItem && React.createElement("div", { className: "fixed bottom-6 left-4 right-4 bg-[#B91C1C] text-white p-3 rounded-xl shadow-2xl z-30 flex justify-between items-center cursor-pointer active:scale-95 transition-transform animate-slide-up", onClick: () => setShowCartModal(true) },
+                React.createElement("div", { className: "flex items-center gap-3" },
+                    React.createElement("div", { className: "bg-white text-[#B91C1C] font-bold w-8 h-8 rounded-full flex items-center justify-center" }, cart.length),
+                    React.createElement("span", { className: "font-bold text-lg" }, `$${total}`)
+                ),
+                React.createElement("span", { className: "font-bold text-sm" }, "查看明細 >")
+            ),
+            selectedItem && React.createElement("div", { className: "fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in" },
+                React.createElement("div", { className: "bg-white w-full max-h-[90vh] rounded-t-2xl shadow-2xl flex flex-col animate-slide-up overflow-hidden" },
+                    React.createElement("div", { className: "p-4 bg-gray-50 border-b flex justify-between items-start" },
+                        React.createElement("div", null,
+                            React.createElement("h3", { className: "font-bold text-lg text-gray-800" }, selectedItem.n),
+                            React.createElement("p", { className: "text-[#B91C1C] font-bold" }, `$${selectedItem.p}`)
+                        ),
+                        React.createElement("button", { onClick: () => setSelectedItem(null), className: "bg-gray-200 rounded-full p-1" }, React.createElement(Icon, {name:"close", className:"w-5 h-5"}))
+                    ),
+                    React.createElement("div", { className: "flex-1 overflow-y-auto p-4 space-y-6" },
+                        selectedItem.category === "義大利麵" && React.createElement("div", null,
+                            React.createElement("h4", { className: "font-bold text-sm mb-2 flex items-center gap-1" }, "選擇麵條", React.createElement("span", {className:"text-[10px] text-red-500"}, "*必選")),
+                            React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                                noodleOptions.map(opt => React.createElement("button", { 
+                                    key: opt.n, 
+                                    onClick: () => setItemOptions({...itemOptions, noodle: opt.n}),
+                                    className: `py-2 text-xs border rounded-lg ${itemOptions.noodle === opt.n ? 'bg-red-50 border-[#B91C1C] text-[#B91C1C] font-bold' : 'border-gray-200 text-gray-600'}` 
+                                }, `${opt.n} ${opt.p > 0 ? `(+$${opt.p})` : ''}`))
+                            )
+                        ),
+                        React.createElement("div", null,
+                            React.createElement("h4", { className: "font-bold text-sm mb-2" }, "辣度調整"),
+                            React.createElement("div", { className: "flex gap-2" },
+                                spiceOptions.map(s => React.createElement("button", { 
+                                    key: s, 
+                                    onClick: () => setItemOptions({...itemOptions, spice: s}),
+                                    className: `flex-1 py-2 text-xs border rounded-lg ${itemOptions.spice === s ? 'bg-red-50 border-[#B91C1C] text-[#B91C1C] font-bold' : 'border-gray-200 text-gray-600'}` 
+                                }, s))
+                            )
+                        ),
+                        React.createElement("div", { className: "bg-yellow-50 p-3 rounded-xl border border-yellow-200" },
+                            React.createElement("h4", { className: "font-bold text-sm mb-2 text-yellow-800" }, "✨ 超值升級？"),
+                            React.createElement("div", { className: "space-y-2" },
+                                comboOptions.map(c => React.createElement("label", { key: c.id, className: "flex items-center justify-between p-2 bg-white rounded-lg border cursor-pointer" },
+                                    React.createElement("div", { className: "flex items-center gap-2" },
+                                        React.createElement("input", { type: "radio", name: "combo", checked: itemOptions.combo === c.id, onChange: () => setItemOptions({...itemOptions, combo: c.id, drink: ''}), className: "accent-[#B91C1C]" }),
+                                        React.createElement("div", null,
+                                            React.createElement("p", { className: "text-sm font-bold" }, c.n),
+                                            c.desc && React.createElement("p", { className: "text-[10px] text-gray-500" }, c.desc)
+                                        )
+                                    ),
+                                    React.createElement("span", { className: "text-xs font-bold text-[#B91C1C]" }, `+$${c.p}`)
+                                ))
+                            )
+                        ),
+                        itemOptions.combo > 0 && React.createElement("div", { className: "animate-fade-in" },
+                            React.createElement("h4", { className: "font-bold text-sm mb-2 flex items-center gap-1" }, "選擇飲品", React.createElement("span", {className:"text-[10px] text-red-500"}, "*必選")),
+                            React.createElement("select", { 
+                                value: itemOptions.drink, 
+                                onChange: (e) => setItemOptions({...itemOptions, drink: e.target.value}),
+                                className: "w-full p-2 border border-gray-300 rounded-lg text-sm bg-white"
+                            },
+                                React.createElement("option", { value: "" }, "請選擇飲料..."),
+                                drinkOptions.map(d => React.createElement("option", { key: d, value: d }, d))
+                            )
+                        )
+                    ),
+                    React.createElement("div", { className: "p-4 border-t bg-white pb-safe" },
+                        React.createElement("button", { onClick: addToCartFromModal, className: "w-full bg-[#B91C1C] text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200 active:scale-95 transition-transform" }, "加入購物車")
+                    )
+                )
+            ),
+            showCartModal && React.createElement("div", { className: "fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm animate-fade-in" },
+                React.createElement("div", { className: "bg-white w-full max-h-[85vh] rounded-t-3xl shadow-2xl flex flex-col animate-slide-up" },
+                    React.createElement("div", { className: "p-4 border-b border-gray-100 flex justify-between items-center" },
+                        React.createElement("h3", { className: "font-bold text-xl text-gray-800" }, "您的餐點"),
+                        React.createElement("button", { onClick: () => setShowCartModal(false), className: "p-2 bg-gray-100 rounded-full text-gray-600" }, React.createElement(Icon, {name: "chevronDown", className: "w-6 h-6"}))
+                    ),
+                    React.createElement("div", { className: "flex-1 overflow-y-auto p-4 space-y-4" },
+                        cart.map(item => React.createElement("div", { key: item.cartId, className: "flex justify-between items-start bg-white border-b border-gray-50 pb-2 last:border-0" },
+                            React.createElement("div", null, 
+                                React.createElement("p", { className: "font-bold text-gray-800" }, item.n), 
+                                React.createElement("div", { className: "text-xs text-gray-500 mt-1" },
+                                    item.noodle && React.createElement("span", {className:"mr-2"}, item.noodle),
+                                    item.spice && React.createElement("span", {className:"mr-2"}, item.spice),
+                                    item.combo > 0 && React.createElement("span", {className:"block text-[#B91C1C]"}, `+${comboOptions.find(c=>c.id===item.combo).n} (${item.drink})`)
+                                ),
+                                React.createElement("p", { className: "text-sm font-bold text-[#B91C1C] mt-1" }, `$${item.unitPrice}`)
+                            ),
+                            React.createElement("button", { onClick: () => removeFromCart(item.cartId), className: "text-gray-400 p-2" }, React.createElement(Icon, {name:"trash", className:"w-4 h-4"}))
+                        ))
+                    ),
+                    React.createElement("div", { className: "p-4 border-t border-gray-100 bg-gray-50 pb-safe" },
+                        React.createElement("div", { className: "flex justify-between items-center mb-4" },
+                            React.createElement("span", { className: "text-gray-600 font-bold" }, "總金額"),
+                            React.createElement("div", { className: "text-right" },
+                                React.createElement("span", { className: `font-bold text-2xl ${total < requiredTotal ? 'text-red-500' : 'text-[#B91C1C]'}` }, `$${total}`),
+                                total < requiredTotal && React.createElement("p", { className: "text-xs text-red-500 font-bold" }, `(未達低消，差$${requiredTotal - total})`)
+                            )
+                        ),
+                        React.createElement("button", { onClick: handleSubmit, className: `w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-all ${total < requiredTotal ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#B91C1C] shadow-red-200 active:scale-95'}` }, "確認預先點餐")
+                    )
+                )
+            )
+        );
     };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));

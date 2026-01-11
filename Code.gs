@@ -68,8 +68,6 @@ function getSheetDataAsJson(sheetName, headers) {
         var obj = {};
         for (var j = 0; j < headerRow.length; j++) {
             if (rowData[j] instanceof Date) {
-                // Adjust for timezone offset if necessary, keeping simple for now
-                // Using a format that preserves the date string correctly for frontend parsing
                 var yyyy = rowData[j].getFullYear();
                 var mm = String(rowData[j].getMonth() + 1).padStart(2, '0');
                 var dd = String(rowData[j].getDate()).padStart(2, '0');
@@ -214,7 +212,6 @@ function registerMember(data) {
   return { status: 'success', member: newMember };
 }
 
-// Helper to generate 2 Letters + 4 Numbers (e.g. AB1234)
 function generateBookingCode() {
   var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   var nums = '0123456789';
@@ -239,15 +236,22 @@ function updateSeatInventory(date, time, deltaPeople) {
     var currentBooked = 0;
 
     // Standardize date string for comparison
-    var targetDate = new Date(date);
-    var targetDateStr = targetDate.getFullYear() + '-' + String(targetDate.getMonth()+1).padStart(2,'0') + '-' + String(targetDate.getDate()).padStart(2,'0');
-
+    var targetDateStr = date; // Expecting 'YYYY-MM-DD' from frontend
+    // If backend logic needs to parse:
+    var targetDateObj = new Date(date);
+    // Ensure we are comparing simple date strings
+    
     // Find existing row
     for (var i = 1; i < data.length; i++) {
-        var rowDate = new Date(data[i][0]);
-        var rowDateStr = rowDate.getFullYear() + '-' + String(rowDate.getMonth()+1).padStart(2,'0') + '-' + String(rowDate.getDate()).padStart(2,'0');
+        var rowDate = data[i][0];
+        var rowDateStr = "";
+        if (rowDate instanceof Date) {
+            rowDateStr = rowDate.getFullYear() + '-' + String(rowDate.getMonth()+1).padStart(2,'0') + '-' + String(rowDate.getDate()).padStart(2,'0');
+        } else {
+            rowDateStr = String(rowDate);
+        }
+        
         var rowTime = data[i][1];
-        // Standardize time string
         if (rowTime instanceof Date) {
             rowTime = rowTime.getHours() + ':' + (rowTime.getMinutes()<10?'0':'') + rowTime.getMinutes();
         } else {
@@ -263,16 +267,12 @@ function updateSeatInventory(date, time, deltaPeople) {
     }
 
     if (rowIndex !== -1) {
-        // Update existing row
         var newBooked = currentBooked + deltaPeople;
-        // Ensure booked doesn't go below 0 (data correction)
         if (newBooked < 0) newBooked = 0;
         var remaining = maxSeats - newBooked;
         sheet.getRange(rowIndex, 4).setValue(newBooked);
         sheet.getRange(rowIndex, 5).setValue(remaining);
     } else {
-        // Create new row
-        // If canceling a booking for a non-existent row, technically shouldn't happen, but we handle it.
         var newBooked = deltaPeople > 0 ? deltaPeople : 0;
         var remaining = maxSeats - newBooked;
         sheet.appendRow([targetDateStr, time, maxSeats, newBooked, remaining]);
@@ -300,7 +300,6 @@ function saveBooking(data) {
       '' 
   ]);
 
-  // Update Inventory
   var totalPeople = Number(data.adults) + Number(data.children);
   updateSeatInventory(data.date, data.time, totalPeople);
 
@@ -311,8 +310,12 @@ function updateBooking(data) {
     var sheet = getOrCreateSheet("訂位紀錄");
     var row = Number(data.bookingId);
     if (row > 1 && row <= sheet.getLastRow()) {
-        // Get old values to calculate difference
         var oldDate = sheet.getRange(row, 4).getValue();
+        var oldDateStr = "";
+        if (oldDate instanceof Date) {
+             oldDateStr = oldDate.getFullYear() + '-' + String(oldDate.getMonth()+1).padStart(2,'0') + '-' + String(oldDate.getDate()).padStart(2,'0');
+        }
+        
         var oldTime = sheet.getRange(row, 5).getValue();
         if (oldTime instanceof Date) {
              oldTime = oldTime.getHours() + ':' + (oldTime.getMinutes()<10?'0':'') + oldTime.getMinutes();
@@ -321,7 +324,6 @@ function updateBooking(data) {
         }
         var oldPeople = Number(sheet.getRange(row, 6).getValue()) + Number(sheet.getRange(row, 7).getValue());
 
-        // Update columns
         sheet.getRange(row, 4).setValue(data.date);       
         sheet.getRange(row, 5).setValue(data.time);       
         sheet.getRange(row, 6).setValue(data.adults);     
@@ -334,21 +336,12 @@ function updateBooking(data) {
         
         var bookingCode = sheet.getRange(row, 1).getValue();
 
-        // Update Inventory Logic
         var newPeople = Number(data.adults) + Number(data.children);
         
-        // If date/time changed, revert old slot and add to new slot
-        // Date objects need specific comparison
-        var oldDateObj = new Date(oldDate);
-        var newDateObj = new Date(data.date);
-        var isDateSame = oldDateObj.getFullYear() === newDateObj.getFullYear() && oldDateObj.getMonth() === newDateObj.getMonth() && oldDateObj.getDate() === newDateObj.getDate();
-
-        if (isDateSame && oldTime === data.time) {
-            // Same slot, just update count difference
+        if (oldDateStr === data.date && oldTime === data.time) {
             updateSeatInventory(data.date, data.time, newPeople - oldPeople);
         } else {
-            // Different slot: remove from old, add to new
-            updateSeatInventory(oldDate, oldTime, -oldPeople);
+            updateSeatInventory(oldDateStr, oldTime, -oldPeople);
             updateSeatInventory(data.date, data.time, newPeople);
         }
 
@@ -361,12 +354,12 @@ function cancelBooking(data) {
     var sheet = getOrCreateSheet("訂位紀錄");
     var row = Number(data.bookingId);
     if (row > 1 && row <= sheet.getLastRow()) {
-        // Need to read date/time/people before deleting to update inventory
-        // If frontend passes this info, great (optimization). If not, we must read.
-        // The frontend 'cancel' passes basic info but it's safer to read from sheet if we trust row ID.
-        // Assuming data.date/time/adults/children are passed correctly from frontend state for speed.
-        // But for consistency let's read from the row to be safe.
         var date = sheet.getRange(row, 4).getValue();
+        var dateStr = "";
+        if (date instanceof Date) {
+             dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+        }
+
         var time = sheet.getRange(row, 5).getValue();
          if (time instanceof Date) {
              time = time.getHours() + ':' + (time.getMinutes()<10?'0':'') + time.getMinutes();
@@ -377,7 +370,7 @@ function cancelBooking(data) {
 
         sheet.deleteRow(row);
 
-        updateSeatInventory(date, time, -people);
+        updateSeatInventory(dateStr, time, -people);
 
         return { status: 'success' };
     }
