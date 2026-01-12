@@ -119,12 +119,13 @@ function getAdminData(params) {
     var admins = ['0937942582', '0978375273', '0978375592'];
     var userPhone = member ? String(member['電話']).replace(/^'/, '').replace(/-/g, '') : '';
     
+    // Check if phone matches admin list
     if (!member || !admins.includes(userPhone)) {
         return { status: 'error', message: '無權限存取後台' };
     }
     var sheet = getOrCreateSheet("訂位紀錄");
     var data = getSheetDataAsJson("訂位紀錄", []);
-    // Filter today and future
+    // Filter today and future bookings
     var today = new Date();
     today.setHours(0,0,0,0);
     var results = data.filter(row => new Date(row['預約日期']) >= today);
@@ -167,9 +168,12 @@ function updateMember(data) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][1] === data.lineUserId) {
+      // 姓名(2), 電話(3), 生日(4), 點數(5), 性別(6), Email(7) -> 0-based index is col-1
       sheet.getRange(i + 1, 3).setValue(data.姓名);
       sheet.getRange(i + 1, 4).setValue("'" + data.電話);
       sheet.getRange(i + 1, 5).setValue(data.生日);
+      sheet.getRange(i + 1, 7).setValue(data.性別);
+      sheet.getRange(i + 1, 8).setValue(data.Email);
       return { status: 'success' };
     }
   }
@@ -187,7 +191,6 @@ function deleteMember(data) {
       found = true;
     }
   }
-  // Optional: Delete from Point History or Booking History could be added here
   return found ? { status: 'success' } : { status: 'error', message: '會員不存在' };
 }
 

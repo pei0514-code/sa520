@@ -54,6 +54,15 @@
     .btn-secondary {
       @apply w-full py-3 bg-white border border-gray-200 text-slate-700 rounded-2xl font-bold shadow-sm active:scale-95 transition-all;
     }
+    
+    /* POS Receipt Style */
+    .pos-receipt {
+      font-family: 'Courier New', Courier, monospace;
+      border: 2px dashed #000;
+      background: #fff;
+      padding: 20px;
+      color: #000;
+    }
 
     /* Custom Toggle */
     .toggle-checkbox:checked { right: 0; border-color: #B91C1C; }
@@ -124,7 +133,8 @@
         x: "M6 18L18 6M6 6l12 12",
         download: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4",
         search: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
-        edit: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+        edit: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
+        printer: "M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
       };
       return React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" },
         React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: paths[name] || "" })
@@ -421,7 +431,6 @@
             )
         ),
 
-        // Non-member warning (if applicable)
         !data.member && React.createElement("div", { className: "bg-blue-50 p-4 rounded-xl flex items-center gap-3 border border-blue-100 mb-2" },
             React.createElement(Icon, { name: "info", className: "w-5 h-5 text-blue-500" }),
             React.createElement("div", null,
@@ -594,6 +603,10 @@
              React.createElement("input", { className: "input-field", value: editForm.姓名, onChange: e => setEditForm({...editForm, 姓名: e.target.value}) }),
              React.createElement("input", { className: "input-field", value: editForm.電話, onChange: e => setEditForm({...editForm, 電話: e.target.value}) }),
              React.createElement("input", { className: "input-field", type: "date", value: editForm.生日?.split('T')[0], onChange: e => setEditForm({...editForm, 生日: e.target.value}) }),
+             React.createElement("select", { className: "input-field", value: editForm.性別, onChange: e => setEditForm({...editForm, 性別: e.target.value}) },
+                React.createElement("option", { value: "男" }, "男"), React.createElement("option", { value: "女" }, "女")
+             ),
+             React.createElement("input", { className: "input-field", type: "email", placeholder: "Email", value: editForm.Email, onChange: e => setEditForm({...editForm, Email: e.target.value}) }),
              React.createElement("div", { className: "flex gap-4" },
                  React.createElement("button", { className: "btn-secondary", onClick: () => setIsEditing(false) }, "取消"),
                  React.createElement("button", { className: "btn-primary", onClick: handleUpdate }, "儲存")
@@ -620,7 +633,7 @@
             React.createElement("div", { className: "flex gap-2 mb-6 overflow-x-auto no-scrollbar" },
                 React.createElement("button", { onClick: () => { setEditForm(data.member); setIsEditing(true); }, className: "px-4 py-2 bg-gray-100 rounded-full text-xs font-bold whitespace-nowrap" }, "修改資料"),
                 React.createElement("button", { onClick: handleDelete, className: "px-4 py-2 bg-gray-100 rounded-full text-xs font-bold text-red-500 whitespace-nowrap" }, "刪除帳號"),
-                isAdmin && React.createElement("button", { onClick: () => setView('ADMIN'), className: "px-4 py-2 bg-slate-800 text-white rounded-full text-xs font-bold whitespace-nowrap" }, "管理員後台")
+                isAdmin && React.createElement("button", { onClick: () => setView('ADMIN'), className: "px-4 py-2 bg-slate-800 text-white rounded-full text-xs font-bold whitespace-nowrap shadow-lg shadow-slate-900/20" }, "管理員後台")
             ),
             React.createElement("div", { className: "space-y-4" },
                 React.createElement("div", { className: "bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex justify-between items-center" },
@@ -672,6 +685,108 @@
          )
     );
 
+    const AdminView = ({ profile, setView }) => {
+        const [bookings, setBookings] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [posModal, setPosModal] = useState(null);
+
+        useEffect(() => {
+            const fetchAdmin = async () => {
+                const res = await runGAS('getAdminData', { lineUserId: profile.userId });
+                if (res.status === 'success') {
+                    setBookings(res.bookings);
+                } else {
+                    Swal.fire('權限錯誤', '您不是管理員', 'error').then(() => setView('HOME'));
+                }
+                setLoading(false);
+            };
+            fetchAdmin();
+        }, []);
+
+        const showPosModal = (b) => {
+            // Format for POS: Simple plain text
+            const orderText = 
+`【${b.訂位代號}】
+日期: ${b.預約日期}
+時間: ${b.預約時間}
+人數: ${b.大人}大 ${b.小孩}小
+姓名: ${b.姓名}
+電話: ${b.電話}
+備註: ${b.備註} ${b.素食==='是'?'(素)':''}
+
+---------- 點餐明細 ----------
+${b.預點餐 ? b.預點餐.split('; ').join('\n') : '無預點餐'}
+----------------------------`;
+            setPosModal(orderText);
+        };
+
+        if (loading) return React.createElement("div", { className: "p-10 text-center" }, "載入管理資料...");
+
+        return React.createElement("div", { className: "p-6 pb-32 animate-fade-in" },
+            React.createElement("div", { className: "flex justify-between items-center mb-6" },
+                 React.createElement("h3", { className: "font-black text-2xl" }, "管理員後台"),
+                 React.createElement("button", { onClick: () => setView('MEMBER'), className: "text-xs font-bold text-gray-500" }, "返回前台")
+            ),
+            
+            // Stats
+            React.createElement("div", { className: "grid grid-cols-2 gap-4 mb-6" },
+                React.createElement("div", { className: "bg-slate-800 text-white p-4 rounded-2xl" },
+                    React.createElement("p", { className: "text-xs opacity-60" }, "今日訂位數"),
+                    React.createElement("p", { className: "text-3xl font-black" }, bookings.filter(b => b.預約日期 === new Date().toISOString().split('T')[0]).length)
+                ),
+                React.createElement("div", { className: "bg-white border p-4 rounded-2xl" },
+                    React.createElement("p", { className: "text-xs text-gray-400" }, "待確認"),
+                    React.createElement("p", { className: "text-3xl font-black text-amber-500" }, bookings.length)
+                )
+            ),
+
+            // List
+            React.createElement("div", { className: "space-y-4" },
+                bookings.map((b, i) => React.createElement("div", { key: i, className: "bg-white p-5 rounded-3xl border border-gray-100 shadow-sm" },
+                    React.createElement("div", { className: "flex justify-between items-start mb-3" },
+                        React.createElement("div", null,
+                            React.createElement("span", { className: "bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded-md mb-2 inline-block" }, b.訂位代號),
+                            React.createElement("h4", { className: "font-black text-lg" }, b.姓名),
+                            React.createElement("p", { className: "text-xs text-gray-500" }, b.電話)
+                        ),
+                        React.createElement("div", { className: "text-right" },
+                             React.createElement("p", { className: "font-bold text-lg" }, b.預約時間),
+                             React.createElement("p", { className: "text-xs text-gray-400" }, b.預約日期)
+                        )
+                    ),
+                    React.createElement("div", { className: "bg-gray-50 p-3 rounded-xl text-xs text-gray-600 mb-3" },
+                         React.createElement("p", null, `人數: ${b.大人}大 ${b.小孩}小 / 椅: ${b.兒童椅}`),
+                         b.備註 && React.createElement("p", { className: "mt-1 text-red-500" }, `備註: ${b.備註}`),
+                         b.預點餐 && React.createElement("div", { className: "mt-2 pt-2 border-t border-gray-200" },
+                             React.createElement("p", { className: "font-bold mb-1" }, "預點餐點:"),
+                             b.預點餐.split('; ').map((item, idx) => React.createElement("p", { key: idx, className: "pl-2" }, `• ${item}`))
+                         )
+                    ),
+                    React.createElement("div", { className: "flex gap-2" },
+                        React.createElement("a", { href: `tel:${b.電話}`, className: "flex-1 py-2 text-center border border-gray-200 rounded-xl text-xs font-bold" }, "撥打電話"),
+                        React.createElement("button", { onClick: () => showPosModal(b), className: "flex-1 py-2 text-center bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1" },
+                            React.createElement(Icon, { name: "printer", className: "w-3 h-3" }), "POS 單"
+                        )
+                    )
+                ))
+            ),
+
+            // POS Modal
+            posModal && React.createElement("div", { className: "fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4", onClick: () => setPosModal(null) },
+                React.createElement("div", { className: "bg-white w-full max-w-sm rounded-lg overflow-hidden", onClick: e => e.stopPropagation() },
+                    React.createElement("div", { className: "p-4 bg-slate-800 text-white flex justify-between items-center" },
+                        React.createElement("h3", { className: "font-bold" }, "POS 輸入模式"),
+                        React.createElement("button", { onClick: () => setPosModal(null) }, React.createElement(Icon, { name: "x", className: "w-5 h-5" }))
+                    ),
+                    React.createElement("div", { className: "p-4 bg-yellow-50 overflow-y-auto max-h-[60vh]" },
+                        React.createElement("pre", { className: "pos-receipt whitespace-pre-wrap text-sm" }, posModal)
+                    ),
+                    React.createElement("div", { className: "p-4 border-t text-center text-xs text-gray-500" }, "請依照上方資訊輸入至 POS 機台")
+                )
+            )
+        );
+    };
+
     const App = () => {
       const [view, setView] = useState('HOME');
       const [data, setData] = useState({});
@@ -706,7 +821,7 @@
       const clearCart = () => setCart([]);
 
       const renderView = () => {
-        if(view === 'ADMIN') return React.createElement("div", null, "Admin Component Placeholder"); 
+        if(view === 'ADMIN') return React.createElement(AdminView, { profile, setView }); 
         switch(view) {
           case 'BOOKING': return React.createElement(BookingView, { profile, data, onComplete: ()=>setView('HOME'), cart, onClearCart: clearCart, setView });
           case 'MENU': return React.createElement(MenuView, { menu: data.restaurantMenu||[], addToCart, cart, setView });
