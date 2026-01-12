@@ -1,0 +1,1 @@
+// 為了確保 Cloudflare Pages 載入順暢，所有邏輯已移至 index.html
