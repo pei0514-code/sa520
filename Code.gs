@@ -1,3 +1,4 @@
+
 // 薩諾瓦義式廚房 - Google Apps Script 後端
 var SPREADSHEET_ID = '1euqf6Hx1TKc858ZU9063jVU2qIoz4L6tUrldDT1g9h8';
 
@@ -144,10 +145,9 @@ function registerMember(data) {
   if(members.find(m => m['LINE ID'] === data.lineUserId)) {
       return { status: 'error', message: '您已是會員' };
   }
-
-  sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 100, data.gender, data.email ]);
-  addPoints(data.lineUserId, 100, "新會員註冊禮");
-  getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
+  
+  // 移除送點數邏輯，預設點數為 0
+  sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 0, data.gender, data.email ]);
   
   return { status: 'success' };
 }
