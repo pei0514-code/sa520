@@ -22,7 +22,7 @@ function doPost(e) {
           seatInventory: getSheetDataAsJson("訂位資訊", ["日期", "時段", "可訂位人數", "已訂位人數", "剩餘空位"])
         };
         break;
-      case 'getAdminData': result = getAdminData(params); break; // New Admin Action
+      case 'getAdminData': result = getAdminData(params); break;
       case 'register': result = registerMember(params); break;
       case 'booking': result = saveBooking(params); break;
       case 'updateBooking': result = updateBooking(params); break;
@@ -291,10 +291,7 @@ function updateSeatInventory(date, time, deltaPeople) {
     var currentBooked = 0;
 
     // Standardize date string for comparison
-    var targetDateStr = date; // Expecting 'YYYY-MM-DD' from frontend
-    // If backend logic needs to parse:
-    var targetDateObj = new Date(date);
-    // Ensure we are comparing simple date strings
+    var targetDateStr = date; 
     
     // Find existing row
     for (var i = 1; i < data.length; i++) {
@@ -352,7 +349,7 @@ function saveBooking(data) {
       data.name, 
       "'" + data.phone, 
       data.notes, 
-      '' 
+      data.preOrder || '' // Save pre-order string here
   ]);
 
   var totalPeople = Number(data.adults) + Number(data.children);
