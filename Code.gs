@@ -17,7 +17,8 @@ function doPost(e) {
           faqs: getSheetDataAsJson("常見問題", ["問題", "回答"]),
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
           restaurantMenu: getSheetDataAsJson("本店餐點", ["類別", "子類別", "產品名稱", "產品價格", "圖片網址", "說明", "標籤"]),
-          bookingsSummary: getBookingsSummary()
+          bookingsSummary: getBookingsSummary(),
+          settings: getSettings() // 新增設定回傳
         };
         break;
       case 'getAdminData': result = getAdminData(params); break;
@@ -28,7 +29,7 @@ function doPost(e) {
       case 'findBooking': result = findBooking(params); break;
       case 'updateMember': result = updateMember(params); break;
       case 'deleteMember': result = deleteMember(params); break;
-      case 'savePreOrder': result = savePreOrder(params); break;
+      case 'saveSettings': result = saveSettings(params); break; // 新增儲存設定
       case 'getUserBookings': result = { status: 'success', bookings: getUserDataByLineId(lineUserId, "訂位紀錄") }; break;
       case 'getPointHistory': result = { status: 'success', history: getUserDataByLineId(lineUserId, "點數紀錄") }; break;
       default:
@@ -52,6 +53,45 @@ function generateBookingCode() {
     code += nums.charAt(Math.floor(Math.random() * nums.length));
   }
   return code;
+}
+
+// ========================
+// Settings (System Config)
+// ========================
+function getSettings() {
+    var sheet = getOrCreateSheet("系統設定", ["設定項目", "值"]);
+    var data = sheet.getDataRange().getValues();
+    var settings = {};
+    // 從第二列開始讀取
+    for (var i = 1; i < data.length; i++) {
+        settings[data[i][0]] = data[i][1];
+    }
+    return settings;
+}
+
+function saveSettings(params) {
+    var sheet = getOrCreateSheet("系統設定", ["設定項目", "值"]);
+    var data = sheet.getDataRange().getValues();
+    var settingsToUpdate = {
+        'RestStartDate': params.restStart,
+        'RestEndDate': params.restEnd
+    };
+
+    // 更新或新增
+    for (var key in settingsToUpdate) {
+        var found = false;
+        for (var i = 1; i < data.length; i++) {
+            if (data[i][0] === key) {
+                sheet.getRange(i + 1, 2).setValue(settingsToUpdate[key]);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            sheet.appendRow([key, settingsToUpdate[key]]);
+        }
+    }
+    return { status: 'success' };
 }
 
 // ========================
@@ -133,7 +173,7 @@ function getAdminData(params) {
     var results = data.filter(row => new Date(row['預約日期']) >= today).sort(function(a, b) {
         return new Date(a['預約日期'] + ' ' + a['預約時間']) - new Date(b['預約日期'] + ' ' + b['預約時間']);
     });
-    return { status: 'success', bookings: results };
+    return { status: 'success', bookings: results, settings: getSettings() };
 }
 
 // ========================
@@ -149,10 +189,8 @@ function registerMember(data) {
       return { status: 'error', message: '您已是會員' };
   }
 
-  // 註冊時初始點數為 0 (取消送100點)
+  // 註冊時初始點數為 0
   sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 0, data.gender, data.email ]);
-  // addPoints(data.lineUserId, 100, "新會員註冊禮"); // 取消贈送
-  // getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]); // 若有集點卡需求可保留
   
   return { status: 'success' };
 }
@@ -173,12 +211,13 @@ function updateMember(data) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][1] === data.lineUserId) {
-      // 姓名(2), 電話(3), 生日(4), 點數(5), 性別(6), Email(7) -> 0-based index is col-1
-      sheet.getRange(i + 1, 3).setValue(data.姓名);
-      sheet.getRange(i + 1, 4).setValue("'" + data.電話);
-      sheet.getRange(i + 1, 5).setValue(data.生日);
-      sheet.getRange(i + 1, 7).setValue(data.性別);
-      sheet.getRange(i + 1, 8).setValue(data.Email);
+      // Columns: 建立時間(0), LINE ID(1), 姓名(2), 電話(3), 生日(4), 點數(5), 性別(6), Email(7)
+      // Array index is 0-based.
+      sheet.getRange(i + 1, 3).setValue(data.name);
+      sheet.getRange(i + 1, 4).setValue("'" + data.phone);
+      sheet.getRange(i + 1, 5).setValue(data.birthday);
+      sheet.getRange(i + 1, 7).setValue(data.gender);
+      sheet.getRange(i + 1, 8).setValue(data.email);
       return { status: 'success' };
     }
   }
@@ -199,21 +238,6 @@ function deleteMember(data) {
   return found ? { status: 'success' } : { status: 'error', message: '會員不存在' };
 }
 
-function addPoints(lineUserId, points, reason) {
-    var historySheet = getOrCreateSheet("點數紀錄", ["時間", "LINE ID", "說明", "點數變化"]);
-    historySheet.appendRow([new Date(), lineUserId, reason, points]);
-    
-    var memberSheet = getOrCreateSheet("會員資料");
-    var data = memberSheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-        if (data[i][1] === lineUserId) {
-            var currentPoints = Number(data[i][5]) || 0;
-            memberSheet.getRange(i + 1, 6).setValue(currentPoints + points);
-            break;
-        }
-    }
-}
-
 // Helper
 function getOrCreateSheet(name, headers) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -226,4 +250,3 @@ function getOrCreateSheet(name, headers) {
   }
   return sheet;
 }
-    
