@@ -72,12 +72,14 @@ function saveSettings(params) {
     var sheet = getOrCreateSheet("系統設定", ["設定項目", "值"]);
     var data = sheet.getDataRange().getValues();
     
+    // 定義允許更新的設定欄位
     var settingsToUpdate = {
         'RestStartDate': params.restStart,
         'RestEndDate': params.restEnd,
         'BookingLeadTime': params.bookingLeadTime,
         'TotalHighChairs': params.totalHighChairs,
-        'MaxGuestsPerSlot': params.maxGuestsPerSlot // 新增
+        'MaxGuestsPerSlot': params.maxGuestsPerSlot,
+        'EnableLineNotify': params.enableLineNotify // 新增：是否開啟LINE通知
     };
 
     for (var key in settingsToUpdate) {
@@ -86,13 +88,14 @@ function saveSettings(params) {
         var found = false;
         for (var i = 1; i < data.length; i++) {
             if (data[i][0] === key) {
-                sheet.getRange(i + 1, 2).setValue(settingsToUpdate[key]);
+                // 將值轉換為字串儲存，避免布林值顯示問題
+                sheet.getRange(i + 1, 2).setValue(String(settingsToUpdate[key]));
                 found = true;
                 break;
             }
         }
         if (!found) {
-            sheet.appendRow([key, settingsToUpdate[key]]);
+            sheet.appendRow([key, String(settingsToUpdate[key])]);
         }
     }
     return { status: 'success' };
