@@ -18,7 +18,7 @@ function doPost(e) {
           promotions: getSheetDataAsJson("活動與優惠", ["類型", "活動日期", "圖片網址", "標題", "內容"]),
           restaurantMenu: getSheetDataAsJson("本店餐點", ["類別", "子類別", "產品名稱", "產品價格", "圖片網址", "說明", "標籤"]),
           bookingsSummary: getBookingsSummary(),
-          settings: getSettings() // 新增設定回傳
+          settings: getSettings() 
         };
         break;
       case 'getAdminData': result = getAdminData(params); break;
@@ -29,7 +29,7 @@ function doPost(e) {
       case 'findBooking': result = findBooking(params); break;
       case 'updateMember': result = updateMember(params); break;
       case 'deleteMember': result = deleteMember(params); break;
-      case 'saveSettings': result = saveSettings(params); break; // 新增儲存設定
+      case 'saveSettings': result = saveSettings(params); break; 
       case 'getUserBookings': result = { status: 'success', bookings: getUserDataByLineId(lineUserId, "訂位紀錄") }; break;
       case 'getPointHistory': result = { status: 'success', history: getUserDataByLineId(lineUserId, "點數紀錄") }; break;
       default:
@@ -62,7 +62,6 @@ function getSettings() {
     var sheet = getOrCreateSheet("系統設定", ["設定項目", "值"]);
     var data = sheet.getDataRange().getValues();
     var settings = {};
-    // 從第二列開始讀取
     for (var i = 1; i < data.length; i++) {
         settings[data[i][0]] = data[i][1];
     }
@@ -72,13 +71,18 @@ function getSettings() {
 function saveSettings(params) {
     var sheet = getOrCreateSheet("系統設定", ["設定項目", "值"]);
     var data = sheet.getDataRange().getValues();
+    
     var settingsToUpdate = {
         'RestStartDate': params.restStart,
-        'RestEndDate': params.restEnd
+        'RestEndDate': params.restEnd,
+        'BookingLeadTime': params.bookingLeadTime,
+        'TotalHighChairs': params.totalHighChairs,
+        'MaxGuestsPerSlot': params.maxGuestsPerSlot // 新增
     };
 
-    // 更新或新增
     for (var key in settingsToUpdate) {
+        if (settingsToUpdate[key] === undefined) continue; 
+        
         var found = false;
         for (var i = 1; i < data.length; i++) {
             if (data[i][0] === key) {
@@ -145,8 +149,26 @@ function getBookingsSummary() {
         var date = new Date(data[i][3]);
         if (date >= today) {
              var timeStr = data[i][4];
-             if (timeStr instanceof Date) timeStr = timeStr.getHours() + ':' + (timeStr.getMinutes()<10?'0':'') + timeStr.getMinutes();
-             summary.push({ date: data[i][3], time: timeStr, count: (Number(data[i][5])||0) + (Number(data[i][6])||0) });
+             // 標準化時間格式
+             if (timeStr instanceof Date) {
+                 var hours = timeStr.getHours();
+                 var mins = timeStr.getMinutes();
+                 timeStr = (hours < 10 ? '0'+hours : hours) + ':' + (mins < 10 ? '0'+mins : mins);
+             } else {
+                 // 如果是字串 11:30，確保格式一致
+                 var parts = String(timeStr).split(':');
+                 if(parts.length === 2) {
+                    timeStr = (parts[0].length === 1 ? '0'+parts[0] : parts[0]) + ':' + parts[1];
+                 }
+             }
+             
+             // 標準化日期格式 YYYY-MM-DD
+             var yyyy = date.getFullYear();
+             var mm = String(date.getMonth() + 1).padStart(2, '0');
+             var dd = String(date.getDate()).padStart(2, '0');
+             var dateStr = yyyy + '-' + mm + '-' + dd;
+
+             summary.push({ date: dateStr, time: timeStr, count: (Number(data[i][5])||0) + (Number(data[i][6])||0) });
         }
     }
     return summary;
@@ -160,16 +182,13 @@ function getAdminData(params) {
     var admins = ['0937942582', '0978375273', '0978375592'];
     var userPhone = member ? String(member['電話']).replace(/^'/, '').replace(/-/g, '') : '';
     
-    // Check if phone matches admin list
     if (!member || !admins.includes(userPhone)) {
         return { status: 'error', message: '無權限存取後台' };
     }
     var sheet = getOrCreateSheet("訂位紀錄");
     var data = getSheetDataAsJson("訂位紀錄", []);
-    // Filter today and future bookings
     var today = new Date();
     today.setHours(0,0,0,0);
-    // Sort by Date then Time
     var results = data.filter(row => new Date(row['預約日期']) >= today).sort(function(a, b) {
         return new Date(a['預約日期'] + ' ' + a['預約時間']) - new Date(b['預約日期'] + ' ' + b['預約時間']);
     });
@@ -182,21 +201,41 @@ function getAdminData(params) {
 
 function registerMember(data) {
   var sheet = getOrCreateSheet("會員資料", ["建立時間", "LINE ID", "姓名", "電話", "生日", "點數", "性別", "Email"]);
-  
-  // Check duplicate
   var members = getSheetDataAsJson("會員資料", []);
   if(members.find(m => m['LINE ID'] === data.lineUserId)) {
       return { status: 'error', message: '您已是會員' };
   }
-
-  // 註冊時初始點數為 0
   sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 0, data.gender, data.email ]);
-  
   return { status: 'success' };
 }
 
 function saveBooking(data) {
   var sheet = getOrCreateSheet("訂位紀錄", ["訂位代號", "建立時間", "LINE ID", "預約日期", "預約時間", "大人", "小孩", "兒童椅", "素食", "姓名", "電話", "備註", "預點餐"]);
+  
+  // --- 容量檢查 (Server Side) ---
+  var settings = getSettings();
+  var maxGuests = parseInt(settings['MaxGuestsPerSlot']) || 20; // 預設 20
+  var currentGuests = 0;
+  
+  // 取得目前的所有訂位
+  var existingBookings = getBookingsSummary();
+  var targetDate = data.date; // 格式已在 getBookingsSummary 標準化 (YYYY-MM-DD)
+  var targetTime = data.time;
+  
+  // 統一格式比較
+  var requestCount = Number(data.adults) + Number(data.children);
+
+  for (var i = 0; i < existingBookings.length; i++) {
+      if (existingBookings[i].date === targetDate && existingBookings[i].time === targetTime) {
+          currentGuests += existingBookings[i].count;
+      }
+  }
+
+  if (currentGuests + requestCount > maxGuests) {
+      return { status: 'error', message: '抱歉，該時段人數已額滿 (剩餘座位: ' + (maxGuests - currentGuests) + ')' };
+  }
+  // --- 結束檢查 ---
+
   var bookingCode = generateBookingCode();
   sheet.appendRow([ 
       bookingCode, new Date(), data.lineUserId, data.date, data.time, 
@@ -211,8 +250,6 @@ function updateMember(data) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (values[i][1] === data.lineUserId) {
-      // Columns: 建立時間(0), LINE ID(1), 姓名(2), 電話(3), 生日(4), 點數(5), 性別(6), Email(7)
-      // Array index is 0-based.
       sheet.getRange(i + 1, 3).setValue(data.name);
       sheet.getRange(i + 1, 4).setValue("'" + data.phone);
       sheet.getRange(i + 1, 5).setValue(data.birthday);
@@ -228,7 +265,6 @@ function deleteMember(data) {
   var sheet = getOrCreateSheet("會員資料");
   var values = sheet.getDataRange().getValues();
   var found = false;
-  // Delete from Member Sheet
   for (var i = values.length - 1; i > 0; i--) {
     if (values[i][1] === data.lineUserId) {
       sheet.deleteRow(i + 1);
@@ -238,7 +274,6 @@ function deleteMember(data) {
   return found ? { status: 'success' } : { status: 'error', message: '會員不存在' };
 }
 
-// Helper
 function getOrCreateSheet(name, headers) {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(name);
