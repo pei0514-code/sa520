@@ -1,3 +1,4 @@
+
 // 薩諾瓦義式廚房 - Google Apps Script 後端
 var SPREADSHEET_ID = '1euqf6Hx1TKc858ZU9063jVU2qIoz4L6tUrldDT1g9h8';
 
@@ -128,7 +129,10 @@ function getAdminData(params) {
     // Filter today and future bookings
     var today = new Date();
     today.setHours(0,0,0,0);
-    var results = data.filter(row => new Date(row['預約日期']) >= today);
+    // Sort by Date then Time
+    var results = data.filter(row => new Date(row['預約日期']) >= today).sort(function(a, b) {
+        return new Date(a['預約日期'] + ' ' + a['預約時間']) - new Date(b['預約日期'] + ' ' + b['預約時間']);
+    });
     return { status: 'success', bookings: results };
 }
 
@@ -145,9 +149,10 @@ function registerMember(data) {
       return { status: 'error', message: '您已是會員' };
   }
 
-  sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 100, data.gender, data.email ]);
-  addPoints(data.lineUserId, 100, "新會員註冊禮");
-  getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]);
+  // 註冊時初始點數為 0 (取消送100點)
+  sheet.appendRow([ new Date(), data.lineUserId, data.name, "'" + data.phone, data.birthday, 0, data.gender, data.email ]);
+  // addPoints(data.lineUserId, 100, "新會員註冊禮"); // 取消贈送
+  // getOrCreateSheet("集點卡", ["LINE ID", "點數"]).appendRow([data.lineUserId, 0]); // 若有集點卡需求可保留
   
   return { status: 'success' };
 }
@@ -221,3 +226,4 @@ function getOrCreateSheet(name, headers) {
   }
   return sheet;
 }
+    
