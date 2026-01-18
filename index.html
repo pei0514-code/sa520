@@ -780,13 +780,27 @@
          
          const handleDateChange = (e) => {
              const selectedDate = e.target.value;
+             if (!selectedDate) {
+                 setForm(prev => ({...prev, date: ''}));
+                 return;
+             }
+
              const dateObj = new Date(selectedDate);
              const day = dateObj.getDay();
              
              // Check Monday (1)
              if (day === 1) {
-                 Swal.fire('週一公休', '每週一為本店公休日，請選擇其他日期', 'warning');
-                 setForm({...form, date: ''});
+                 // 先清空日期，避免 UI 顯示錯誤
+                 setForm(prev => ({...prev, date: ''}));
+                 // 延遲彈出視窗，防止手機版日期選擇器卡死或陷入循環
+                 setTimeout(() => {
+                     Swal.fire({
+                         title: '週一公休',
+                         text: '每週一為本店公休日，請選擇其他日期',
+                         icon: 'warning',
+                         confirmButtonColor: '#000'
+                     });
+                 }, 200);
                  return;
              }
              
@@ -794,13 +808,24 @@
              if (data.settings?.RestStartDate && data.settings?.RestEndDate) {
                  const start = new Date(data.settings.RestStartDate);
                  const end = new Date(data.settings.RestEndDate);
+                 // 設定時間為 00:00:00 確保日期比較正確
+                 start.setHours(0,0,0,0);
+                 end.setHours(23,59,59,999);
+                 
                  if (dateObj >= start && dateObj <= end) {
-                     Swal.fire('本店休息中', `休假期間：${data.settings.RestStartDate} ~ ${data.settings.RestEndDate}`, 'warning');
-                     setForm({...form, date: ''});
+                     setForm(prev => ({...prev, date: ''}));
+                     setTimeout(() => {
+                         Swal.fire({
+                             title: '本店休息中',
+                             text: `休假期間：${data.settings.RestStartDate} ~ ${data.settings.RestEndDate}`,
+                             icon: 'warning',
+                             confirmButtonColor: '#000'
+                         });
+                     }, 200);
                      return;
                  }
              }
-             setForm({...form, date: selectedDate, time: ""});
+             setForm(prev => ({...prev, date: selectedDate, time: ""}));
          };
 
          const handleBooking = async () => {
