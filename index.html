@@ -224,7 +224,9 @@
         plus: "M12 4v16m8-8H4",
         phone_fill: "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z",
         settings: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-        check: "M5 13l4 4L19 7"
+        check: "M5 13l4 4L19 7",
+        chevronLeft: "M15 19l-7-7 7-7",
+        chevronRight: "M9 5l7 7-7 7"
       };
       return React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className, fill: name === 'facebook' ? "currentColor" : "none", viewBox: "0 0 24 24", stroke: name === 'facebook' ? "none" : "currentColor", strokeWidth: "2.5" },
         React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: paths[name] || "" })
@@ -767,6 +769,127 @@
         );
     };
 
+    // Custom Calendar Component for Date Selection
+    const CalendarModal = ({ onClose, onSelect, restSettings }) => {
+        const [viewDate, setViewDate] = useState(new Date());
+
+        const getDaysInMonth = (year, month) => {
+            return new Date(year, month + 1, 0).getDate();
+        };
+
+        const getFirstDayOfMonth = (year, month) => {
+            return new Date(year, month, 1).getDay();
+        };
+
+        const generateCalendarDays = () => {
+            const year = viewDate.getFullYear();
+            const month = viewDate.getMonth();
+            const daysInMonth = getDaysInMonth(year, month);
+            const firstDay = getFirstDayOfMonth(year, month);
+            
+            const days = [];
+            
+            // Add empty slots for days before the first day of the month
+            for (let i = 0; i < firstDay; i++) {
+                days.push(null);
+            }
+            
+            // Add days of the month
+            for (let i = 1; i <= daysInMonth; i++) {
+                days.push(new Date(year, month, i));
+            }
+            
+            return days;
+        };
+
+        const isDateDisabled = (date) => {
+            if (!date) return true;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Disable past dates
+            if (date < today) return true;
+            
+            // Disable Mondays (day 1)
+            if (date.getDay() === 1) return true;
+            
+            // Disable Rest Period
+            if (restSettings?.RestStartDate && restSettings?.RestEndDate) {
+                // Parse date strings "YYYY-MM-DD" safely to local Date
+                const parseLocal = (s) => {
+                    if(!s) return null;
+                    const [y,m,d] = s.split('-').map(Number);
+                    return new Date(y, m-1, d);
+                };
+
+                const restStart = parseLocal(restSettings.RestStartDate);
+                const restEnd = parseLocal(restSettings.RestEndDate);
+                
+                if (restStart && restEnd) {
+                    restEnd.setHours(23, 59, 59, 999);
+                    if (date >= restStart && date <= restEnd) return true;
+                }
+            }
+            return false;
+        };
+        
+        const changeMonth = (offset) => {
+            const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1);
+            setViewDate(newDate);
+        };
+
+        const days = generateCalendarDays();
+        const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+        return React.createElement("div", { className: "fixed inset-0 z-[10000] flex items-center justify-center p-4" },
+            React.createElement("div", { className: "absolute inset-0 bg-black/60", onClick: onClose }),
+            React.createElement("div", { className: "bg-white w-full max-w-sm rounded-2xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative z-10 overflow-hidden" },
+                React.createElement("div", { className: "bg-[#FCD34D] p-4 border-b-4 border-black flex justify-between items-center" },
+                    React.createElement("button", { onClick: () => changeMonth(-1), className: "p-2 hover:bg-white/50 rounded-full transition-colors" }, React.createElement(Icon, { name: "chevronLeft", className: "w-6 h-6" })),
+                    React.createElement("span", { className: "font-black text-xl" }, `${viewDate.getFullYear()}年 ${viewDate.getMonth() + 1}月`),
+                    React.createElement("button", { onClick: () => changeMonth(1), className: "p-2 hover:bg-white/50 rounded-full transition-colors" }, React.createElement(Icon, { name: "chevronRight", className: "w-6 h-6" }))
+                ),
+                React.createElement("div", { className: "p-4" },
+                    React.createElement("div", { className: "grid grid-cols-7 mb-2" },
+                        weekDays.map(d => React.createElement("div", { key: d, className: "text-center font-black text-slate-500 text-sm py-2" }, d))
+                    ),
+                    React.createElement("div", { className: "grid grid-cols-7 gap-1" },
+                        days.map((date, idx) => {
+                            if (!date) return React.createElement("div", { key: `empty-${idx}` });
+                            const disabled = isDateDisabled(date);
+                            const isToday = new Date().toDateString() === date.toDateString();
+                            
+                            // Format date for value passing YYYY-MM-DD
+                            const yyyy = date.getFullYear();
+                            const mm = String(date.getMonth() + 1).padStart(2, '0');
+                            const dd = String(date.getDate()).padStart(2, '0');
+                            const dateStr = `${yyyy}-${mm}-${dd}`;
+
+                            return React.createElement("button", {
+                                key: idx,
+                                disabled: disabled,
+                                onClick: () => !disabled && onSelect(dateStr),
+                                className: `
+                                    h-10 flex items-center justify-center rounded-lg font-bold text-sm transition-all
+                                    ${disabled 
+                                        ? 'bg-slate-100 text-slate-300 cursor-not-allowed' 
+                                        : isToday
+                                            ? 'bg-black text-white' 
+                                            : 'hover:bg-yellow-100 hover:text-black hover:font-black'
+                                    }
+                                `
+                            }, date.getDate());
+                        })
+                    )
+                ),
+                React.createElement("div", { className: "p-4 border-t-2 border-dashed border-black bg-slate-50 text-center" },
+                     React.createElement("p", { className: "text-xs font-bold text-slate-400" }, "灰色日期為公休或已過期")
+                )
+            )
+        );
+    };
+
     const BookingView = ({ profile, data, onComplete, cart, onClearCart, setView, setPendingBooking, pendingBooking, navigateToMenu }) => {
          // ... existing BookingView state ...
          const [form, setForm] = useState(pendingBooking || { 
@@ -775,57 +898,13 @@
             phone: data.member?.電話?.replace(/'/g,'') || "", notes: "" 
           });
          const [loading, setLoading] = useState(false);
+         const [showCalendar, setShowCalendar] = useState(false); // State to toggle calendar
 
          const times = ['11:00','11:30','12:00','12:30','13:00','17:00','17:30','18:00','18:30','19:00','19:30'];
          
-         const handleDateChange = (e) => {
-             const selectedDate = e.target.value;
-             if (!selectedDate) {
-                 setForm(prev => ({...prev, date: ''}));
-                 return;
-             }
-
-             const dateObj = new Date(selectedDate);
-             const day = dateObj.getDay();
-             
-             // Check Monday (1)
-             if (day === 1) {
-                 // 先清空日期，避免 UI 顯示錯誤
-                 setForm(prev => ({...prev, date: ''}));
-                 // 延遲彈出視窗，防止手機版日期選擇器卡死或陷入循環
-                 setTimeout(() => {
-                     Swal.fire({
-                         title: '週一公休',
-                         text: '每週一為本店公休日，請選擇其他日期',
-                         icon: 'warning',
-                         confirmButtonColor: '#000'
-                     });
-                 }, 200);
-                 return;
-             }
-             
-             // Check Rest Range
-             if (data.settings?.RestStartDate && data.settings?.RestEndDate) {
-                 const start = new Date(data.settings.RestStartDate);
-                 const end = new Date(data.settings.RestEndDate);
-                 // 設定時間為 00:00:00 確保日期比較正確
-                 start.setHours(0,0,0,0);
-                 end.setHours(23,59,59,999);
-                 
-                 if (dateObj >= start && dateObj <= end) {
-                     setForm(prev => ({...prev, date: ''}));
-                     setTimeout(() => {
-                         Swal.fire({
-                             title: '本店休息中',
-                             text: `休假期間：${data.settings.RestStartDate} ~ ${data.settings.RestEndDate}`,
-                             icon: 'warning',
-                             confirmButtonColor: '#000'
-                         });
-                     }, 200);
-                     return;
-                 }
-             }
-             setForm(prev => ({...prev, date: selectedDate, time: ""}));
+         const handleDateSelect = (dateStr) => {
+             setForm({...form, date: dateStr, time: ""});
+             setShowCalendar(false);
          };
 
          const handleBooking = async () => {
@@ -874,7 +953,13 @@
                  React.createElement("div", { className: "absolute -top-4 left-4 bg-[#F9A8D4] border-2 border-black px-3 py-1 rounded-lg shadow-[2px_2px_0px_0px_black] transform -rotate-2" }, React.createElement("span", { className: "font-black text-sm" }, "STEP 1: 選擇時間")),
                  React.createElement("div", { className: "mt-4 space-y-4" },
                      React.createElement("label", { className: "block text-sm font-bold text-slate-500" }, "預約日期 (週一公休)"),
-                     React.createElement("input", { type: "date", className: "comic-input text-center text-lg tracking-widest bg-yellow-50", value: form.date, min: new Date().toISOString().split('T')[0], onChange: handleDateChange }),
+                     
+                     // Custom Calendar Trigger replacing native input
+                     React.createElement("div", { 
+                         onClick: () => setShowCalendar(true),
+                         className: "comic-input text-center text-lg tracking-widest bg-yellow-50 cursor-pointer flex items-center justify-center h-[58px]" 
+                     }, form.date || React.createElement("span", { className: "text-slate-400 text-sm" }, "點擊選擇日期")),
+                     
                      React.createElement("div", { className: "mt-6" },
                         React.createElement("label", { className: "block text-sm font-bold text-slate-500 mb-3" }, `預約時段 (需提前 ${data.settings?.BookingLeadTime || 2} 小時)`),
                         form.date ? React.createElement("div", { className: "grid grid-cols-3 gap-3" }, times.map(t => {
@@ -889,6 +974,13 @@
                      )
                  )
              ),
+             
+             // Render Calendar Modal
+             showCalendar && React.createElement(CalendarModal, { 
+                 onClose: () => setShowCalendar(false), 
+                 onSelect: handleDateSelect,
+                 restSettings: data.settings
+             }),
 
              React.createElement("div", { className: "comic-box p-6 bg-white relative" },
                   React.createElement("div", { className: "absolute -top-4 right-4 bg-[#BAE6FD] border-2 border-black px-3 py-1 rounded-lg shadow-[2px_2px_0px_0px_black] transform rotate-1" }, React.createElement("span", { className: "font-black text-sm" }, "STEP 2: 用餐人數")),
